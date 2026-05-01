@@ -1,5 +1,6 @@
 """Read-level evidence classification primitives for variant verification."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -31,6 +32,19 @@ class ReadAlleleCall:
     reason: UnusableReason | None = None
     observed_base: str | None = None
     base_quality: int | None = None
+
+
+@dataclass(frozen=True)
+class AggregatedEvidence:
+    """Strand-aware summary of read-level allele calls at one locus."""
+
+    alt_forward: int
+    alt_reverse: int
+    non_alt_forward: int
+    non_alt_reverse: int
+    usable: int
+    unusable: int
+    unusable_by_reason: dict[UnusableReason, int]
 
 
 def classify_snv_read(
@@ -91,3 +105,8 @@ def classify_snv_read(
         observed_base=observed_base,
         base_quality=base_quality,
     )
+
+
+def aggregate_read_calls(calls: Iterable[ReadAlleleCall]) -> AggregatedEvidence:
+    """Aggregate read-level calls into strand-aware evidence counts."""
+    raise NotImplementedError("read-call aggregation is not implemented yet")
