@@ -1,0 +1,191 @@
+from dataclasses import dataclass
+
+from skua.evidence import AlleleSupport, UnusableReason, classify_snv_read
+
+
+@dataclass
+class FakeRead:
+    mapping_quality: int
+    is_reverse: bool
+    query_sequence: str
+    query_qualities: list[int]
+    aligned_pairs: list[tuple[int | None, int | None]]
+
+
+def build_linear_pairs(read_len: int, ref_start: int) -> list[tuple[int, int]]:
+    return [(qpos, ref_start + qpos) for qpos in range(read_len)]
+
+
+def test_classify_alt_on_forward_strand() -> None:
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=False,
+        query_sequence="AAAAATAAAA",
+        query_qualities=[35] * 10,
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.ALT
+    assert call.is_reverse is False
+    assert call.reason is None
+    assert call.observed_base == "T"
+
+
+def test_classify_alt_on_reverse_strand() -> None:
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=True,
+        query_sequence="AAAAATAAAA",
+        query_qualities=[35] * 10,
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.ALT
+    assert call.is_reverse is True
+    assert call.reason is None
+    assert call.observed_base == "T"
+
+
+def test_classify_non_alt_read() -> None:
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=False,
+        query_sequence="AAAAAAAAAA",
+        query_qualities=[35] * 10,
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.NON_ALT
+    assert call.reason is None
+    assert call.observed_base == "A"
+
+
+def test_classify_unusable_for_deletion_at_locus() -> None:
+    aligned_pairs: list[tuple[int | None, int | None]] = [
+        (0, 100),
+        (1, 101),
+        (2, 102),
+        (3, 103),
+        (4, 104),
+        (None, 105),
+        (5, 106),
+        (6, 107),
+        (7, 108),
+        (8, 109),
+    ]
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=False,
+        query_sequence="AAAAAAAAA",
+        query_qualities=[35] * 9,
+        aligned_pairs=aligned_pairs,
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.UNUSABLE
+    assert call.reason == UnusableReason.NO_BASE_AT_SITE
+    assert call.observed_base is None
+
+
+def test_classify_unusable_for_low_base_quality() -> None:
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=False,
+        query_sequence="AAAAATAAAA",
+        query_qualities=[35, 35, 35, 35, 35, 10, 35, 35, 35, 35],
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.UNUSABLE
+    assert call.reason == UnusableReason.LOW_BASEQ
+    assert call.observed_base == "T"
+
+
+def test_classify_unusable_for_low_mapping_quality() -> None:
+    read = FakeRead(
+        mapping_quality=5,
+        is_reverse=False,
+        query_sequence="AAAAATAAAA",
+        query_qualities=[35] * 10,
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.UNUSABLE
+    assert call.reason == UnusableReason.LOW_MAPQ
+    assert call.observed_base is None
+
+
+def test_classify_unusable_for_invalid_base() -> None:
+    read = FakeRead(
+        mapping_quality=60,
+        is_reverse=False,
+        query_sequence="AAAAANAAAA",
+        query_qualities=[35] * 10,
+        aligned_pairs=build_linear_pairs(10, 100),
+    )
+
+    call = classify_snv_read(
+        read,
+        ref_pos0=105,
+        ref_base="A",
+        alt_base="T",
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert call.support == AlleleSupport.UNUSABLE
+    assert call.reason == UnusableReason.INVALID_BASE
+    assert call.observed_base == "N"
