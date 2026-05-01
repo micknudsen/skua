@@ -1,5 +1,6 @@
 """Read-level evidence classification primitives for variant verification."""
 
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
@@ -109,4 +110,41 @@ def classify_snv_read(
 
 def aggregate_read_calls(calls: Iterable[ReadAlleleCall]) -> AggregatedEvidence:
     """Aggregate read-level calls into strand-aware evidence counts."""
-    raise NotImplementedError("read-call aggregation is not implemented yet")
+    alt_forward = 0
+    alt_reverse = 0
+    non_alt_forward = 0
+    non_alt_reverse = 0
+    usable = 0
+    unusable = 0
+    unusable_by_reason: Counter[UnusableReason] = Counter()
+
+    for call in calls:
+        if call.support == AlleleSupport.ALT:
+            usable += 1
+            if call.is_reverse:
+                alt_reverse += 1
+            else:
+                alt_forward += 1
+            continue
+
+        if call.support == AlleleSupport.NON_ALT:
+            usable += 1
+            if call.is_reverse:
+                non_alt_reverse += 1
+            else:
+                non_alt_forward += 1
+            continue
+
+        unusable += 1
+        if call.reason is not None:
+            unusable_by_reason[call.reason] += 1
+
+    return AggregatedEvidence(
+        alt_forward=alt_forward,
+        alt_reverse=alt_reverse,
+        non_alt_forward=non_alt_forward,
+        non_alt_reverse=non_alt_reverse,
+        usable=usable,
+        unusable=unusable,
+        unusable_by_reason=dict(unusable_by_reason),
+    )
