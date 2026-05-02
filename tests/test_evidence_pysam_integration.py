@@ -10,22 +10,6 @@ HEADER = {
     "SQ": [{"SN": "chr1", "LN": 1000}],
 }
 
-
-
-def write_bam_read(
-    bam_path: Path,
-    *,
-    query_name: str,
-    query_sequence: str,
-    reference_start: int,
-    mapping_quality: int = 60,
-    is_reverse: bool = False,
-) -> None:
-    with pysam.AlignmentFile(bam_path, "ab", header=HEADER) as _:
-        pass
-
-
-
 def build_aligned_segment(
     *,
     query_name: str,
