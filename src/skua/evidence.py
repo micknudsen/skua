@@ -172,3 +172,25 @@ def collect_snv_evidence(
         for read in reads
     ]
     return aggregate_read_calls(calls)
+
+
+def collect_snv_evidence_from_alignment(
+    alignment_file: Any,
+    *,
+    contig: str,
+    ref_pos0: int,
+    ref_base: str,
+    alt_base: str,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> AggregatedEvidence:
+    """Fetch overlapping reads for one SNV and collect strand-aware evidence."""
+    reads = alignment_file.fetch(contig, ref_pos0, ref_pos0 + 1)
+    return collect_snv_evidence(
+        reads,
+        ref_pos0=ref_pos0,
+        ref_base=ref_base,
+        alt_base=alt_base,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
+    )
