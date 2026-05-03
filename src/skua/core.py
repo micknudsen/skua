@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Iterable
 from typing import Iterator
 
@@ -120,6 +121,37 @@ def write_verification_results_json(
     )
 
 
+def _build_verification_rows(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    min_baseq: int,
+    min_mapq: int,
+) -> list[dict[str, Any]]:
+    """Build formatted verification rows from one alignment and one VCF."""
+    return format_verification_results(
+        verify_snv_variants_from_vcf(
+            alignment_file,
+            vcf_path,
+            min_baseq=min_baseq,
+            min_mapq=min_mapq,
+        )
+    )
+
+
+def _render_and_optionally_write(
+    rows: Iterable[dict[str, Any]],
+    *,
+    renderer: Callable[[Iterable[dict[str, Any]]], str],
+    output_path: str | Path | None,
+) -> str:
+    """Render rows and optionally persist the payload to disk."""
+    payload = renderer(rows)
+    if output_path is not None:
+        Path(output_path).write_text(payload, encoding="utf-8")
+    return payload
+
+
 def verify_snv_vcf_to_json(
     alignment_file: Any,
     vcf_path: str | Path,
@@ -129,18 +161,17 @@ def verify_snv_vcf_to_json(
     min_mapq: int = 20,
 ) -> str:
     """Run SNV verification from VCF and return JSON output, optionally writing to file."""
-    rows = format_verification_results(
-        verify_snv_variants_from_vcf(
-            alignment_file,
-            vcf_path,
-            min_baseq=min_baseq,
-            min_mapq=min_mapq,
-        )
+    rows = _build_verification_rows(
+        alignment_file,
+        vcf_path,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
     )
-    payload = render_verification_results_json(rows)
-    if output_path is not None:
-        Path(output_path).write_text(payload, encoding="utf-8")
-    return payload
+    return _render_and_optionally_write(
+        rows,
+        renderer=render_verification_results_json,
+        output_path=output_path,
+    )
 
 
 def verify_snv_vcf_to_tsv(
@@ -152,15 +183,14 @@ def verify_snv_vcf_to_tsv(
     min_mapq: int = 20,
 ) -> str:
     """Run SNV verification from VCF and return TSV output, optionally writing to file."""
-    rows = format_verification_results(
-        verify_snv_variants_from_vcf(
-            alignment_file,
-            vcf_path,
-            min_baseq=min_baseq,
-            min_mapq=min_mapq,
-        )
+    rows = _build_verification_rows(
+        alignment_file,
+        vcf_path,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
     )
-    payload = render_verification_results_tsv(rows)
-    if output_path is not None:
-        Path(output_path).write_text(payload, encoding="utf-8")
-    return payload
+    return _render_and_optionally_write(
+        rows,
+        renderer=render_verification_results_tsv,
+        output_path=output_path,
+    )
