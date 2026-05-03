@@ -81,6 +81,34 @@ def render_verification_results_json(rows: Iterable[dict[str, Any]]) -> str:
     return json.dumps(list(rows), indent=2)
 
 
+def render_verification_results_tsv(rows: Iterable[dict[str, Any]]) -> str:
+    """Render formatted verification rows as TSV text."""
+    columns = [
+        "contig",
+        "pos1",
+        "ref",
+        "alt",
+        "alt_forward",
+        "alt_reverse",
+        "non_alt_forward",
+        "non_alt_reverse",
+        "usable",
+        "unusable",
+        "unusable_by_reason",
+    ]
+    lines = ["\t".join(columns)]
+    for row in rows:
+        serialized_row: list[str] = []
+        for column in columns:
+            value = row[column]
+            if column == "unusable_by_reason":
+                serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
+            else:
+                serialized_row.append(str(value))
+        lines.append("\t".join(serialized_row))
+    return "\n".join(lines) + "\n"
+
+
 def write_verification_results_json(
     rows: Iterable[dict[str, Any]],
     output_path: str | Path,
@@ -110,6 +138,29 @@ def verify_snv_vcf_to_json(
         )
     )
     payload = render_verification_results_json(rows)
+    if output_path is not None:
+        Path(output_path).write_text(payload, encoding="utf-8")
+    return payload
+
+
+def verify_snv_vcf_to_tsv(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    output_path: str | Path | None = None,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> str:
+    """Run SNV verification from VCF and return TSV output, optionally writing to file."""
+    rows = format_verification_results(
+        verify_snv_variants_from_vcf(
+            alignment_file,
+            vcf_path,
+            min_baseq=min_baseq,
+            min_mapq=min_mapq,
+        )
+    )
+    payload = render_verification_results_tsv(rows)
     if output_path is not None:
         Path(output_path).write_text(payload, encoding="utf-8")
     return payload

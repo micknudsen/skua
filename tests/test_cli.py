@@ -177,3 +177,60 @@ def test_main_verify_requires_reference_for_cram(capsys) -> None:
         raise AssertionError("Expected SystemExit for missing CRAM reference")
 
     assert "--reference is required for CRAM input" in capsys.readouterr().err
+
+
+def test_main_verify_prints_tsv_when_format_tsv(monkeypatch, capsys) -> None:
+    calls: list[dict[str, object]] = []
+
+    class FakeAlignmentFile:
+        def __init__(self, path: str, mode: str, **kwargs) -> None:
+            self.path = path
+            self.mode = mode
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    def fake_verify_tsv(alignment_file, vcf_path, **kwargs):
+        calls.append(
+            {
+                "alignment_path": alignment_file.path,
+                "alignment_mode": alignment_file.mode,
+                "alignment_kwargs": alignment_file.kwargs,
+                "vcf_path": str(vcf_path),
+                **kwargs,
+            }
+        )
+        return "col1\tcol2\nA\tB\n"
+
+    monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
+    monkeypatch.setattr(cli, "verify_snv_vcf_to_tsv", fake_verify_tsv)
+
+    exit_code = cli.main(
+        [
+            "verify",
+            "--vcf",
+            "input.vcf",
+            "--alignment",
+            "reads.bam",
+            "--format",
+            "tsv",
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls == [
+        {
+            "alignment_path": "reads.bam",
+            "alignment_mode": "rb",
+            "alignment_kwargs": {},
+            "vcf_path": "input.vcf",
+            "output_path": None,
+            "min_baseq": 20,
+            "min_mapq": 20,
+        }
+    ]
+    assert capsys.readouterr().out == "col1\tcol2\nA\tB\n\n"
