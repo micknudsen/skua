@@ -30,6 +30,77 @@ def verify_snv_variant(
     )
 
 
+def verify_snv_variant_with_normals(
+    alignment_file: Any,
+    variant: Variant,
+    *,
+    normal_alignments: list[Any] | None = None,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> dict[str, Any]:
+    """Collect case and normal evidence for one SNV variant."""
+    if normal_alignments is None:
+        normal_alignments = []
+
+    case_evidence = verify_snv_variant(
+        alignment_file,
+        variant,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
+    )
+
+    normal_evidences: list[AggregatedEvidence] = []
+    normal_aggregate_evidence = AggregatedEvidence(
+        alt_forward=0,
+        alt_reverse=0,
+        non_alt_forward=0,
+        non_alt_reverse=0,
+        usable=0,
+        unusable=0,
+        unusable_by_reason={},
+    )
+
+    normals_with_alt = 0
+    normals_with_ref_only = 0
+
+    for normal_alignment in normal_alignments:
+        normal_evidence = verify_snv_variant(
+            normal_alignment,
+            variant,
+            min_baseq=min_baseq,
+            min_mapq=min_mapq,
+        )
+        normal_evidences.append(normal_evidence)
+
+        normal_unusable_by_reason = dict(normal_aggregate_evidence.unusable_by_reason)
+        for reason, count in normal_evidence.unusable_by_reason.items():
+            normal_unusable_by_reason[reason] = normal_unusable_by_reason.get(reason, 0) + count
+
+        normal_aggregate_evidence = AggregatedEvidence(
+            alt_forward=normal_aggregate_evidence.alt_forward + normal_evidence.alt_forward,
+            alt_reverse=normal_aggregate_evidence.alt_reverse + normal_evidence.alt_reverse,
+            non_alt_forward=normal_aggregate_evidence.non_alt_forward + normal_evidence.non_alt_forward,
+            non_alt_reverse=normal_aggregate_evidence.non_alt_reverse + normal_evidence.non_alt_reverse,
+            usable=normal_aggregate_evidence.usable + normal_evidence.usable,
+            unusable=normal_aggregate_evidence.unusable + normal_evidence.unusable,
+            unusable_by_reason=normal_unusable_by_reason,
+        )
+
+        alt_count = normal_evidence.alt_forward + normal_evidence.alt_reverse
+        if alt_count > 0:
+            normals_with_alt += 1
+        else:
+            normals_with_ref_only += 1
+
+    return {
+        "case_evidence": case_evidence,
+        "normal_evidences": normal_evidences,
+        "normal_aggregate_evidence": normal_aggregate_evidence,
+        "normals_with_alt": normals_with_alt,
+        "normals_with_ref_only": normals_with_ref_only,
+    }
+
+
 def verify_snv_variants_from_vcf(
     alignment_file: Any,
     vcf_path: str | Path,
@@ -192,5 +263,182 @@ def verify_snv_vcf_to_tsv(
     return _render_and_optionally_write(
         rows,
         renderer=render_verification_results_tsv,
+        output_path=output_path,
+    )
+
+
+def verify_snv_variants_from_vcf_with_normals(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    normal_alignments: list[Any] | None = None,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> Iterator[tuple[Variant, dict[str, Any]]]:
+    """Yield per-variant case+normal evidence for SNV records from a VCF file."""
+    if normal_alignments is None:
+        normal_alignments = []
+
+    for variant in read_vcf_snv_file(vcf_path):
+        yield (
+            variant,
+            verify_snv_variant_with_normals(
+                alignment_file,
+                variant,
+                normal_alignments=normal_alignments,
+                min_baseq=min_baseq,
+                min_mapq=min_mapq,
+            ),
+        )
+
+
+def format_verification_results_with_normals(
+    results: Iterable[tuple[Variant, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Convert PON verification results to JSON/tabular-ready row dictionaries."""
+    rows: list[dict[str, Any]] = []
+    for variant, pon_result in results:
+        evidence = pon_result["case_evidence"]
+        normal_aggregate_evidence = pon_result["normal_aggregate_evidence"]
+        rows.append(
+            {
+                "contig": variant.contig,
+                "pos1": variant.ref_pos0 + 1,
+                "ref": variant.ref,
+                "alt": variant.alt,
+                "alt_forward": evidence.alt_forward,
+                "alt_reverse": evidence.alt_reverse,
+                "non_alt_forward": evidence.non_alt_forward,
+                "non_alt_reverse": evidence.non_alt_reverse,
+                "usable": evidence.usable,
+                "unusable": evidence.unusable,
+                "unusable_by_reason": {
+                    reason.value: count
+                    for reason, count in evidence.unusable_by_reason.items()
+                },
+                "normal_alt_forward": normal_aggregate_evidence.alt_forward,
+                "normal_alt_reverse": normal_aggregate_evidence.alt_reverse,
+                "normal_non_alt_forward": normal_aggregate_evidence.non_alt_forward,
+                "normal_non_alt_reverse": normal_aggregate_evidence.non_alt_reverse,
+                "normal_usable": normal_aggregate_evidence.usable,
+                "normal_unusable": normal_aggregate_evidence.unusable,
+                "normal_unusable_by_reason": {
+                    reason.value: count
+                    for reason, count in normal_aggregate_evidence.unusable_by_reason.items()
+                },
+                "normals_with_alt": pon_result["normals_with_alt"],
+                "normals_with_ref_only": pon_result["normals_with_ref_only"],
+            }
+        )
+    return rows
+
+
+def render_verification_results_tsv_with_normals(rows: Iterable[dict[str, Any]]) -> str:
+    """Render formatted PON verification rows as TSV text."""
+    columns = [
+        "contig",
+        "pos1",
+        "ref",
+        "alt",
+        "alt_forward",
+        "alt_reverse",
+        "non_alt_forward",
+        "non_alt_reverse",
+        "usable",
+        "unusable",
+        "unusable_by_reason",
+        "normal_alt_forward",
+        "normal_alt_reverse",
+        "normal_non_alt_forward",
+        "normal_non_alt_reverse",
+        "normal_usable",
+        "normal_unusable",
+        "normal_unusable_by_reason",
+        "normals_with_alt",
+        "normals_with_ref_only",
+    ]
+    lines = ["\t".join(columns)]
+    for row in rows:
+        serialized_row: list[str] = []
+        for column in columns:
+            value = row[column]
+            if column in {"unusable_by_reason", "normal_unusable_by_reason"}:
+                serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
+            else:
+                serialized_row.append(str(value))
+        lines.append("\t".join(serialized_row))
+    return "\n".join(lines) + "\n"
+
+
+def _build_verification_rows_with_normals(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    normal_alignments: list[Any] | None,
+    min_baseq: int,
+    min_mapq: int,
+) -> list[dict[str, Any]]:
+    """Build formatted PON verification rows from case + normal alignments and one VCF."""
+    return format_verification_results_with_normals(
+        verify_snv_variants_from_vcf_with_normals(
+            alignment_file,
+            vcf_path,
+            normal_alignments=normal_alignments,
+            min_baseq=min_baseq,
+            min_mapq=min_mapq,
+        )
+    )
+
+
+def verify_snv_vcf_to_json_with_normals(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    normal_alignments: list[Any] | None = None,
+    output_path: str | Path | None = None,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> str:
+    """Run PON SNV verification from VCF and return JSON output, optionally writing to file."""
+    if normal_alignments is None:
+        normal_alignments = []
+
+    rows = _build_verification_rows_with_normals(
+        alignment_file,
+        vcf_path,
+        normal_alignments=normal_alignments,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
+    )
+    return _render_and_optionally_write(
+        rows,
+        renderer=render_verification_results_json,
+        output_path=output_path,
+    )
+
+
+def verify_snv_vcf_to_tsv_with_normals(
+    alignment_file: Any,
+    vcf_path: str | Path,
+    *,
+    normal_alignments: list[Any] | None = None,
+    output_path: str | Path | None = None,
+    min_baseq: int = 20,
+    min_mapq: int = 20,
+) -> str:
+    """Run PON SNV verification from VCF and return TSV output, optionally writing to file."""
+    if normal_alignments is None:
+        normal_alignments = []
+
+    rows = _build_verification_rows_with_normals(
+        alignment_file,
+        vcf_path,
+        normal_alignments=normal_alignments,
+        min_baseq=min_baseq,
+        min_mapq=min_mapq,
+    )
+    return _render_and_optionally_write(
+        rows,
+        renderer=render_verification_results_tsv_with_normals,
         output_path=output_path,
     )

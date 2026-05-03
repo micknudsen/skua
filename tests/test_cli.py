@@ -234,3 +234,63 @@ def test_main_verify_prints_tsv_when_format_tsv(monkeypatch, capsys) -> None:
         }
     ]
     assert capsys.readouterr().out == "col1\tcol2\nA\tB\n\n"
+
+
+def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys) -> None:
+    calls: list[dict[str, object]] = []
+
+    class FakeAlignmentFile:
+        def __init__(self, path: str, mode: str, **kwargs) -> None:
+            self.path = path
+            self.mode = mode
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def close(self) -> None:
+            pass
+
+    def fake_verify_with_normals(alignment_file, vcf_path, **kwargs):
+        calls.append(
+            {
+                "case_path": alignment_file.path,
+                "vcf_path": str(vcf_path),
+                "normal_count": len(kwargs.get("normal_alignments", [])),
+                **{k: v for k, v in kwargs.items() if k != "normal_alignments"},
+            }
+        )
+        return "{\"ok\": true}"
+
+    monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
+    monkeypatch.setattr(cli, "verify_snv_vcf_to_json_with_normals", fake_verify_with_normals)
+
+    exit_code = cli.main(
+        [
+            "verify",
+            "--vcf",
+            "input.vcf",
+            "--alignment",
+            "case.bam",
+            "--normal",
+            "normal1.bam",
+            "--normal",
+            "normal2.bam",
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls == [
+        {
+            "case_path": "case.bam",
+            "vcf_path": "input.vcf",
+            "normal_count": 2,
+            "output_path": None,
+            "min_baseq": 20,
+            "min_mapq": 20,
+        }
+    ]
+    assert capsys.readouterr().out == "{\"ok\": true}\n"

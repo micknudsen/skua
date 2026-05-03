@@ -7,6 +7,7 @@ from skua.core import (
     verify_snv_vcf_to_tsv,
     verify_snv_vcf_to_json,
     verify_snv_variant,
+    verify_snv_variant_with_normals,
     verify_snv_variants_from_vcf,
     write_verification_results_json,
 )
@@ -382,3 +383,182 @@ def test_verify_snv_vcf_to_tsv_returns_payload_and_writes_file(tmp_path) -> None
     )
     assert payload == expected_payload
     assert output_path.read_text(encoding="utf-8") == expected_payload
+
+
+def test_verify_snv_variant_with_normals_returns_case_and_normal_evidence() -> None:
+    case_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=True,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    case_alignment = FakeAlignmentFile(case_reads)
+
+    normal1_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    normal1_alignment = FakeAlignmentFile(normal1_reads)
+
+    normal2_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    normal2_alignment = FakeAlignmentFile(normal2_reads)
+
+    variant = Variant(contig="chr1", ref_pos0=105, ref="A", alt="T")
+
+    result = verify_snv_variant_with_normals(
+        case_alignment,
+        variant,
+        normal_alignments=[normal1_alignment, normal2_alignment],
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    assert result["case_evidence"].alt_forward == 1
+    assert result["case_evidence"].non_alt_forward == 0
+    assert len(result["normal_evidences"]) == 2
+    assert result["normal_aggregate_evidence"].alt_forward == 1
+    assert result["normal_aggregate_evidence"].non_alt_forward == 1
+    assert result["normal_aggregate_evidence"].usable == 2
+    assert result["normal_aggregate_evidence"].unusable == 0
+    assert result["normals_with_alt"] == 1
+    assert result["normals_with_ref_only"] == 1
+
+
+def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> None:
+    from skua.core import verify_snv_vcf_to_json_with_normals
+
+    case_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    case_alignment = FakeAlignmentFile(case_reads)
+
+    normal_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    normal_alignment = FakeAlignmentFile(normal_reads)
+
+    vcf_path = tmp_path / "input.vcf"
+    vcf_path.write_text(
+        "\n".join(
+            [
+                "##fileformat=VCFv4.2",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
+            ]
+        )
+        + "\n"
+    )
+
+    payload = verify_snv_vcf_to_json_with_normals(
+        case_alignment,
+        vcf_path,
+        normal_alignments=[normal_alignment],
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    import json
+    result = json.loads(payload)
+    assert len(result) == 1
+    assert result[0]["contig"] == "chr1"
+    assert result[0]["pos1"] == 106
+    assert result[0]["normal_alt_forward"] == 0
+    assert result[0]["normal_alt_reverse"] == 0
+    assert result[0]["normal_non_alt_forward"] == 1
+    assert result[0]["normal_non_alt_reverse"] == 0
+    assert result[0]["normal_usable"] == 1
+    assert result[0]["normal_unusable"] == 0
+    assert result[0]["normal_unusable_by_reason"] == {}
+    assert result[0]["normals_with_alt"] == 0
+    assert result[0]["normals_with_ref_only"] == 1
+
+
+def test_verify_snv_vcf_to_tsv_with_normals_returns_pon_payload(tmp_path) -> None:
+    from skua.core import verify_snv_vcf_to_tsv_with_normals
+
+    case_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    case_alignment = FakeAlignmentFile(case_reads)
+
+    normal_reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    normal_alignment = FakeAlignmentFile(normal_reads)
+
+    vcf_path = tmp_path / "input.vcf"
+    vcf_path.write_text(
+        "\n".join(
+            [
+                "##fileformat=VCFv4.2",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
+            ]
+        )
+        + "\n"
+    )
+
+    payload = verify_snv_vcf_to_tsv_with_normals(
+        case_alignment,
+        vcf_path,
+        normal_alignments=[normal_alignment],
+        min_baseq=20,
+        min_mapq=20,
+    )
+
+    lines = payload.strip().split("\n")
+    assert lines[0].startswith("contig\tpos1\tref\talt")
+    assert "normal_alt_forward" in lines[0]
+    assert "normal_non_alt_forward" in lines[0]
+    assert "normal_usable" in lines[0]
+    assert "normal_unusable_by_reason" in lines[0]
+    assert "normals_with_alt" in lines[0]
+    assert "normals_with_ref_only" in lines[0]
+    assert "chr1\t106\tA\tT" in lines[1]
