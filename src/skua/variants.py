@@ -1,6 +1,8 @@
 """Variant parsing and normalization helpers."""
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterator
 
 
 @dataclass(frozen=True)
@@ -46,3 +48,12 @@ def parse_vcf_snv_line(line: str) -> Variant | None:
         return Variant.from_vcf_fields(contig=contig, pos1=pos1, ref=ref, alt=alt)
     except ValueError:
         return None
+
+
+def read_vcf_snv_file(path: str | Path) -> Iterator[Variant]:
+    """Yield SNV variants from a VCF file, skipping unsupported records."""
+    with Path(path).open("r", encoding="utf-8") as handle:
+        for line in handle:
+            variant = parse_vcf_snv_line(line)
+            if variant is not None:
+                yield variant
