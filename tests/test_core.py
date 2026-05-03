@@ -130,13 +130,15 @@ def test_format_verification_results_returns_json_ready_records() -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 2,
-            "non_alt_forward": 3,
-            "non_alt_reverse": 4,
-            "usable": 10,
-            "unusable": 2,
-            "unusable_by_reason": {"low_mapq": 2},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 2,
+                "non_alt_forward": 3,
+                "non_alt_reverse": 4,
+                "usable": 10,
+                "unusable": 2,
+                "unusable_by_reason": {"low_mapq": 2},
+            },
         }
     ]
 
@@ -195,13 +197,15 @@ def test_verify_and_format_from_vcf_end_to_end(tmp_path) -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 0,
-            "non_alt_forward": 0,
-            "non_alt_reverse": 1,
-            "usable": 2,
-            "unusable": 1,
-            "unusable_by_reason": {"low_mapq": 1},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 0,
+                "non_alt_forward": 0,
+                "non_alt_reverse": 1,
+                "usable": 2,
+                "unusable": 1,
+                "unusable_by_reason": {"low_mapq": 1},
+            },
         }
     ]
 
@@ -213,13 +217,15 @@ def test_render_verification_results_json_returns_json_text() -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 0,
-            "non_alt_forward": 0,
-            "non_alt_reverse": 1,
-            "usable": 2,
-            "unusable": 1,
-            "unusable_by_reason": {"low_mapq": 1},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 0,
+                "non_alt_forward": 0,
+                "non_alt_reverse": 1,
+                "usable": 2,
+                "unusable": 1,
+                "unusable_by_reason": {"low_mapq": 1},
+            },
         }
     ]
 
@@ -235,13 +241,15 @@ def test_write_verification_results_json_writes_payload_to_file(tmp_path) -> Non
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 0,
-            "non_alt_forward": 0,
-            "non_alt_reverse": 1,
-            "usable": 2,
-            "unusable": 1,
-            "unusable_by_reason": {"low_mapq": 1},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 0,
+                "non_alt_forward": 0,
+                "non_alt_reverse": 1,
+                "usable": 2,
+                "unusable": 1,
+                "unusable_by_reason": {"low_mapq": 1},
+            },
         }
     ]
     output_path = tmp_path / "verification.json"
@@ -258,21 +266,23 @@ def test_render_verification_results_tsv_returns_tsv_text() -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 0,
-            "non_alt_forward": 0,
-            "non_alt_reverse": 1,
-            "usable": 2,
-            "unusable": 1,
-            "unusable_by_reason": {"low_mapq": 1},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 0,
+                "non_alt_forward": 0,
+                "non_alt_reverse": 1,
+                "usable": 2,
+                "unusable": 1,
+                "unusable_by_reason": {"low_mapq": 1},
+            },
         }
     ]
 
     payload = render_verification_results_tsv(rows)
 
     assert payload == (
-        "contig\tpos1\tref\talt\talt_forward\talt_reverse\tnon_alt_forward\tnon_alt_reverse\tusable\tunusable\tunusable_by_reason\n"
-        "chr1\t106\tA\tT\t1\t0\t0\t1\t2\t1\t{\"low_mapq\":1}\n"
+        "contig\tpos1\tref\talt\tcase\n"
+        "chr1\t106\tA\tT\t{\"alt_forward\":1,\"alt_reverse\":0,\"non_alt_forward\":0,\"non_alt_reverse\":1,\"unusable\":1,\"unusable_by_reason\":{\"low_mapq\":1},\"usable\":2}\n"
     )
 
 
@@ -323,13 +333,15 @@ def test_verify_snv_vcf_to_json_returns_payload_and_writes_file(tmp_path) -> Non
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "alt_forward": 1,
-            "alt_reverse": 0,
-            "non_alt_forward": 0,
-            "non_alt_reverse": 1,
-            "usable": 2,
-            "unusable": 0,
-            "unusable_by_reason": {},
+            "case": {
+                "alt_forward": 1,
+                "alt_reverse": 0,
+                "non_alt_forward": 0,
+                "non_alt_reverse": 1,
+                "usable": 2,
+                "unusable": 0,
+                "unusable_by_reason": {},
+            },
         }
     ]
     assert json.loads(payload) == expected_rows
@@ -378,8 +390,8 @@ def test_verify_snv_vcf_to_tsv_returns_payload_and_writes_file(tmp_path) -> None
     )
 
     expected_payload = (
-        "contig\tpos1\tref\talt\talt_forward\talt_reverse\tnon_alt_forward\tnon_alt_reverse\tusable\tunusable\tunusable_by_reason\n"
-        "chr1\t106\tA\tT\t1\t0\t0\t1\t2\t0\t{}\n"
+        "contig\tpos1\tref\talt\tcase\n"
+        "chr1\t106\tA\tT\t{\"alt_forward\":1,\"alt_reverse\":0,\"non_alt_forward\":0,\"non_alt_reverse\":1,\"unusable\":0,\"unusable_by_reason\":{},\"usable\":2}\n"
     )
     assert payload == expected_payload
     assert output_path.read_text(encoding="utf-8") == expected_payload
@@ -443,8 +455,8 @@ def test_verify_snv_variant_with_normals_returns_case_and_normal_evidence() -> N
     assert result["normal_aggregate_evidence"].non_alt_forward == 1
     assert result["normal_aggregate_evidence"].usable == 2
     assert result["normal_aggregate_evidence"].unusable == 0
-    assert result["normals_with_alt"] == 1
-    assert result["normals_with_ref_only"] == 1
+    assert "normals_with_alt" not in result
+    assert "normals_with_ref_only" not in result
 
 
 def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> None:
@@ -497,22 +509,26 @@ def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> No
     assert len(result) == 1
     assert result[0]["contig"] == "chr1"
     assert result[0]["pos1"] == 106
-    assert result[0]["normal_alt_forward"] == 0
-    assert result[0]["normal_alt_reverse"] == 0
-    assert result[0]["normal_non_alt_forward"] == 1
-    assert result[0]["normal_non_alt_reverse"] == 0
-    assert result[0]["normal_usable"] == 1
-    assert result[0]["normal_unusable"] == 0
-    assert result[0]["normal_unusable_by_reason"] == {}
-    assert result[0]["normals_with_alt"] == 0
-    assert result[0]["normals_with_ref_only"] == 1
-    assert result[0]["strand_aware_pon_stats"]["background_rate_by_channel"]["non_alt_forward"] == 1.0
-    assert result[0]["strand_aware_pon_stats"]["combined_score"] > 0.0
-    assert 0.0 <= result[0]["strand_aware_pon_stats"]["p_value"] <= 1.0
-    assert result[0]["strand_aware_pon_stats"]["method"] == "chi_square_4channel_approx"
-    assert result[0]["strand_aware_pon_stats"]["degrees_of_freedom"] == 4
-    assert result[0]["strand_aware_pon_stats"]["pseudocount"] == 0.5
-    assert result[0]["strand_aware_pon_stats"]["approximation_warning"] is True
+    assert result[0]["normal"]["alt_forward"] == 0
+    assert result[0]["normal"]["alt_reverse"] == 0
+    assert result[0]["normal"]["non_alt_forward"] == 1
+    assert result[0]["normal"]["non_alt_reverse"] == 0
+    assert result[0]["normal"]["usable"] == 1
+    assert result[0]["normal"]["unusable"] == 0
+    assert result[0]["normal"]["unusable_by_reason"] == {}
+    assert result[0]["case"]["alt_forward"] == 1
+    assert result[0]["case"]["alt_reverse"] == 0
+    assert result[0]["case"]["non_alt_forward"] == 0
+    assert result[0]["case"]["non_alt_reverse"] == 0
+    assert result[0]["case"]["usable"] == 1
+    assert result[0]["case"]["unusable"] == 0
+    assert result[0]["case"]["unusable_by_reason"] == {}
+    assert result[0]["statistics"]["bayes_factor"] >= 0.0
+    assert 0.0 <= result[0]["statistics"]["posterior_probability"] <= 1.0
+    assert set(result[0]["statistics"].keys()) == {
+        "bayes_factor",
+        "posterior_probability",
+    }
 
 
 def test_verify_snv_vcf_to_tsv_with_normals_returns_pon_payload(tmp_path) -> None:
@@ -562,11 +578,9 @@ def test_verify_snv_vcf_to_tsv_with_normals_returns_pon_payload(tmp_path) -> Non
 
     lines = payload.strip().split("\n")
     assert lines[0].startswith("contig\tpos1\tref\talt")
-    assert "normal_alt_forward" in lines[0]
-    assert "normal_non_alt_forward" in lines[0]
-    assert "normal_usable" in lines[0]
-    assert "normal_unusable_by_reason" in lines[0]
-    assert "normals_with_alt" in lines[0]
-    assert "normals_with_ref_only" in lines[0]
-    assert "strand_aware_pon_stats" in lines[0]
+    assert "case" in lines[0]
+    assert "normal" in lines[0]
+    assert "normals_with_alt" not in lines[0]
+    assert "normals_with_ref_only" not in lines[0]
+    assert "statistics" in lines[0]
     assert "chr1\t106\tA\tT" in lines[1]

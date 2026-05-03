@@ -15,47 +15,55 @@ _CHANNELS = (
 
 
 @dataclass(frozen=True)
-class StrandAwarePonStats:
+class Statistics:
     """Typed strand-aware summary for case vs panel-of-normals background."""
 
     case_counts: dict[str, int]
     normal_counts: dict[str, int]
     background_rate_by_channel: dict[str, float]
     expected_case_counts: dict[str, float]
-    channel_score_contribution: dict[str, float]
-    combined_score: float
-    p_value: float
-    method: str
-    degrees_of_freedom: int
+    bayes_factor: float
+    log_bayes_factor_artifact_vs_variant: float
+    posterior_probability: float
+    dispersion_rho: float
     pseudocount: float
-    min_expected_count: float
-    approximation_warning: bool
 
     def to_dict(self) -> dict[str, dict[str, float | int] | float]:
         """Return a JSON-serializable representation."""
         return {
-            "case_counts": dict(self.case_counts),
-            "normal_counts": dict(self.normal_counts),
-            "background_rate_by_channel": dict(self.background_rate_by_channel),
-            "expected_case_counts": dict(self.expected_case_counts),
-            "channel_score_contribution": dict(self.channel_score_contribution),
-            "combined_score": self.combined_score,
-            "p_value": self.p_value,
-            "method": self.method,
-            "degrees_of_freedom": self.degrees_of_freedom,
-            "pseudocount": self.pseudocount,
-            "min_expected_count": self.min_expected_count,
-            "approximation_warning": self.approximation_warning,
+            "bayes_factor": self.bayes_factor,
+            "posterior_probability": self.posterior_probability,
         }
 
 
-def compute_strand_aware_pon_stats(
+def _bound(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _log_beta(a: float, b: float) -> float:
+    return math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+
+
+def _logbb(x: int, n: int, mu_scaled: float, disp: float) -> float:
+    """Log beta-binomial term (without binomial coefficient), following deepSNV."""
+    return _log_beta(x + mu_scaled, n - x - mu_scaled + disp) - _log_beta(mu_scaled, disp - mu_scaled)
+
+
+def compute_stats(
     case_evidence: AggregatedEvidence,
     normal_evidence: AggregatedEvidence,
     *,
+    rho: float = 1e-4,
     pseudocount: float = 0.5,
-) -> StrandAwarePonStats:
-    """Compute basic strand-aware background estimates and score contributions."""
+    prior_variant_probability: float = 0.5,
+    mu_min: float = 1e-6,
+    mu_max: float = 1 - 1e-6,
+) -> Statistics:
+    """Compute a Shearwater-style beta-binomial Bayes-factor summary.
+
+    The Bayes factor is oriented as artifact-vs-variant (null/alternative),
+    consistent with the original deepSNV Shearwater code path.
+    """
     case_counts = {
         "alt_forward": case_evidence.alt_forward,
         "alt_reverse": case_evidence.alt_reverse,
@@ -80,37 +88,78 @@ def compute_strand_aware_pon_stats(
         channel: case_total * background_rate_by_channel[channel]
         for channel in _CHANNELS
     }
-    min_expected_count = min(expected_case_counts.values()) if expected_case_counts else 0.0
-    # Rule of thumb: chi-square approximation is less reliable when expected counts are small.
-    approximation_warning = min_expected_count < 5.0
-    channel_score_contribution = {
-        channel: (
-            (case_counts[channel] - expected_case_counts[channel])
-            / math.sqrt(expected_case_counts[channel] + pseudocount)
-            if case_total > 0
-            else 0.0
-        )
-        for channel in _CHANNELS
-    }
-    combined_score = math.sqrt(
-        sum(contribution * contribution for contribution in channel_score_contribution.values())
-    )
-    chi2_stat = combined_score * combined_score
-    # Survival function for Chi-square with k=4 degrees of freedom:
-    # sf(x) = exp(-x/2) * (1 + x/2)
-    p_value = math.exp(-chi2_stat / 2.0) * (1.0 + chi2_stat / 2.0)
 
-    return StrandAwarePonStats(
+    x_fw = case_counts["alt_forward"]
+    x_bw = case_counts["alt_reverse"]
+    n_fw = x_fw + case_counts["non_alt_forward"]
+    n_bw = x_bw + case_counts["non_alt_reverse"]
+
+    X_fw = normal_counts["alt_forward"]
+    X_bw = normal_counts["alt_reverse"]
+    N_fw = X_fw + normal_counts["non_alt_forward"]
+    N_bw = X_bw + normal_counts["non_alt_reverse"]
+
+    if case_total == 0:
+        log_bayes_factor = 0.0
+    else:
+        rho = _bound(rho, 1e-6, 1 - 1e-6)
+        disp = (1.0 - rho) / rho
+
+        mu = _bound(
+            (x_fw + x_bw + pseudocount) / (n_fw + n_bw + 2.0 * pseudocount),
+            mu_min,
+            mu_max,
+        )
+        nu0_fw = _bound(
+            (X_fw + x_fw + pseudocount) / (N_fw + n_fw + 2.0 * pseudocount),
+            mu_min,
+            mu_max,
+        )
+        nu0_bw = _bound(
+            (X_bw + x_bw + pseudocount) / (N_bw + n_bw + 2.0 * pseudocount),
+            mu_min,
+            mu_max,
+        )
+        nu_fw = _bound((X_fw + pseudocount) / (N_fw + 2.0 * pseudocount), mu_min, mu_max)
+        nu_bw = _bound((X_bw + pseudocount) / (N_bw + 2.0 * pseudocount), mu_min, mu_max)
+
+        mu_scaled = mu * disp
+        nu0_fw_scaled = nu0_fw * disp
+        nu0_bw_scaled = nu0_bw * disp
+        nu_fw_scaled = nu_fw * disp
+        nu_bw_scaled = nu_bw * disp
+
+        # AND-model style Bayes factor terms from deepSNV Shearwater formulation.
+        log_bayes_factor = (
+            _logbb(x_fw, n_fw, nu0_fw_scaled, disp)
+            + _logbb(X_fw, N_fw, nu0_fw_scaled, disp)
+            + _logbb(x_bw, n_bw, nu0_bw_scaled, disp)
+            + _logbb(X_bw, N_bw, nu0_bw_scaled, disp)
+            - _logbb(x_fw, n_fw, mu_scaled, disp)
+            - _logbb(X_fw, N_fw, nu_fw_scaled, disp)
+            - _logbb(x_bw, n_bw, mu_scaled, disp)
+            - _logbb(X_bw, N_bw, nu_bw_scaled, disp)
+        )
+
+    if log_bayes_factor > 700:
+        bayes_factor = float("inf")
+    elif log_bayes_factor < -700:
+        bayes_factor = 0.0
+    else:
+        bayes_factor = math.exp(log_bayes_factor)
+
+    prior_variant_probability = _bound(prior_variant_probability, 1e-12, 1 - 1e-12)
+    odds_variant = prior_variant_probability / (1.0 - prior_variant_probability)
+    posterior_probability = odds_variant / (bayes_factor + odds_variant)
+
+    return Statistics(
         case_counts=case_counts,
         normal_counts=normal_counts,
         background_rate_by_channel=background_rate_by_channel,
         expected_case_counts=expected_case_counts,
-        channel_score_contribution=channel_score_contribution,
-        combined_score=combined_score,
-        p_value=p_value,
-        method="chi_square_4channel_approx",
-        degrees_of_freedom=4,
+        bayes_factor=bayes_factor,
+        log_bayes_factor_artifact_vs_variant=log_bayes_factor,
+        posterior_probability=posterior_probability,
+        dispersion_rho=rho,
         pseudocount=pseudocount,
-        min_expected_count=min_expected_count,
-        approximation_warning=approximation_warning,
     )

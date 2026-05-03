@@ -8,7 +8,7 @@ from typing import Iterable
 from typing import Iterator
 
 from .evidence import AggregatedEvidence, collect_snv_evidence_from_alignment
-from .stats import compute_strand_aware_pon_stats
+from .stats import compute_stats
 from .variants import Variant, read_vcf_snv_file
 
 
@@ -61,9 +61,6 @@ def verify_snv_variant_with_normals(
         unusable_by_reason={},
     )
 
-    normals_with_alt = 0
-    normals_with_ref_only = 0
-
     for normal_alignment in normal_alignments:
         normal_evidence = verify_snv_variant(
             normal_alignment,
@@ -87,18 +84,10 @@ def verify_snv_variant_with_normals(
             unusable_by_reason=normal_unusable_by_reason,
         )
 
-        alt_count = normal_evidence.alt_forward + normal_evidence.alt_reverse
-        if alt_count > 0:
-            normals_with_alt += 1
-        else:
-            normals_with_ref_only += 1
-
     return {
         "case_evidence": case_evidence,
         "normal_evidences": normal_evidences,
         "normal_aggregate_evidence": normal_aggregate_evidence,
-        "normals_with_alt": normals_with_alt,
-        "normals_with_ref_only": normals_with_ref_only,
     }
 
 
@@ -134,15 +123,17 @@ def format_verification_results(
                 "pos1": variant.ref_pos0 + 1,
                 "ref": variant.ref,
                 "alt": variant.alt,
-                "alt_forward": evidence.alt_forward,
-                "alt_reverse": evidence.alt_reverse,
-                "non_alt_forward": evidence.non_alt_forward,
-                "non_alt_reverse": evidence.non_alt_reverse,
-                "usable": evidence.usable,
-                "unusable": evidence.unusable,
-                "unusable_by_reason": {
-                    reason.value: count
-                    for reason, count in evidence.unusable_by_reason.items()
+                "case": {
+                    "alt_forward": evidence.alt_forward,
+                    "alt_reverse": evidence.alt_reverse,
+                    "non_alt_forward": evidence.non_alt_forward,
+                    "non_alt_reverse": evidence.non_alt_reverse,
+                    "usable": evidence.usable,
+                    "unusable": evidence.unusable,
+                    "unusable_by_reason": {
+                        reason.value: count
+                        for reason, count in evidence.unusable_by_reason.items()
+                    },
                 },
             }
         )
@@ -161,20 +152,14 @@ def render_verification_results_tsv(rows: Iterable[dict[str, Any]]) -> str:
         "pos1",
         "ref",
         "alt",
-        "alt_forward",
-        "alt_reverse",
-        "non_alt_forward",
-        "non_alt_reverse",
-        "usable",
-        "unusable",
-        "unusable_by_reason",
+        "case",
     ]
     lines = ["\t".join(columns)]
     for row in rows:
         serialized_row: list[str] = []
         for column in columns:
             value = row[column]
-            if column == "unusable_by_reason":
+            if column == "case":
                 serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
             else:
                 serialized_row.append(str(value))
@@ -301,7 +286,7 @@ def format_verification_results_with_normals(
     for variant, pon_result in results:
         evidence = pon_result["case_evidence"]
         normal_aggregate_evidence = pon_result["normal_aggregate_evidence"]
-        strand_aware_pon_stats = compute_strand_aware_pon_stats(
+        statistics = compute_stats(
             evidence,
             normal_aggregate_evidence,
         )
@@ -311,29 +296,31 @@ def format_verification_results_with_normals(
                 "pos1": variant.ref_pos0 + 1,
                 "ref": variant.ref,
                 "alt": variant.alt,
-                "alt_forward": evidence.alt_forward,
-                "alt_reverse": evidence.alt_reverse,
-                "non_alt_forward": evidence.non_alt_forward,
-                "non_alt_reverse": evidence.non_alt_reverse,
-                "usable": evidence.usable,
-                "unusable": evidence.unusable,
-                "unusable_by_reason": {
-                    reason.value: count
-                    for reason, count in evidence.unusable_by_reason.items()
+                "case": {
+                    "alt_forward": evidence.alt_forward,
+                    "alt_reverse": evidence.alt_reverse,
+                    "non_alt_forward": evidence.non_alt_forward,
+                    "non_alt_reverse": evidence.non_alt_reverse,
+                    "usable": evidence.usable,
+                    "unusable": evidence.unusable,
+                    "unusable_by_reason": {
+                        reason.value: count
+                        for reason, count in evidence.unusable_by_reason.items()
+                    },
                 },
-                "normal_alt_forward": normal_aggregate_evidence.alt_forward,
-                "normal_alt_reverse": normal_aggregate_evidence.alt_reverse,
-                "normal_non_alt_forward": normal_aggregate_evidence.non_alt_forward,
-                "normal_non_alt_reverse": normal_aggregate_evidence.non_alt_reverse,
-                "normal_usable": normal_aggregate_evidence.usable,
-                "normal_unusable": normal_aggregate_evidence.unusable,
-                "normal_unusable_by_reason": {
-                    reason.value: count
-                    for reason, count in normal_aggregate_evidence.unusable_by_reason.items()
+                "normal": {
+                    "alt_forward": normal_aggregate_evidence.alt_forward,
+                    "alt_reverse": normal_aggregate_evidence.alt_reverse,
+                    "non_alt_forward": normal_aggregate_evidence.non_alt_forward,
+                    "non_alt_reverse": normal_aggregate_evidence.non_alt_reverse,
+                    "usable": normal_aggregate_evidence.usable,
+                    "unusable": normal_aggregate_evidence.unusable,
+                    "unusable_by_reason": {
+                        reason.value: count
+                        for reason, count in normal_aggregate_evidence.unusable_by_reason.items()
+                    },
                 },
-                "normals_with_alt": pon_result["normals_with_alt"],
-                "normals_with_ref_only": pon_result["normals_with_ref_only"],
-                "strand_aware_pon_stats": strand_aware_pon_stats.to_dict(),
+                "statistics": statistics.to_dict(),
             }
         )
     return rows
@@ -346,30 +333,16 @@ def render_verification_results_tsv_with_normals(rows: Iterable[dict[str, Any]])
         "pos1",
         "ref",
         "alt",
-        "alt_forward",
-        "alt_reverse",
-        "non_alt_forward",
-        "non_alt_reverse",
-        "usable",
-        "unusable",
-        "unusable_by_reason",
-        "normal_alt_forward",
-        "normal_alt_reverse",
-        "normal_non_alt_forward",
-        "normal_non_alt_reverse",
-        "normal_usable",
-        "normal_unusable",
-        "normal_unusable_by_reason",
-        "normals_with_alt",
-        "normals_with_ref_only",
-        "strand_aware_pon_stats",
+        "case",
+        "normal",
+        "statistics",
     ]
     lines = ["\t".join(columns)]
     for row in rows:
         serialized_row: list[str] = []
         for column in columns:
             value = row[column]
-            if column in {"unusable_by_reason", "normal_unusable_by_reason", "strand_aware_pon_stats"}:
+            if column in {"case", "normal", "statistics"}:
                 serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
             else:
                 serialized_row.append(str(value))
