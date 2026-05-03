@@ -1,5 +1,6 @@
 """Core public API for skua."""
 
+import json
 from pathlib import Path
 from typing import Any
 from typing import Iterable
@@ -73,3 +74,19 @@ def format_verification_results(
             }
         )
     return rows
+
+
+def render_verification_results_json(rows: Iterable[dict[str, Any]]) -> str:
+    """Render formatted verification rows as JSON text."""
+    return json.dumps(list(rows), indent=2)
+
+
+def write_verification_results_json(
+    rows: Iterable[dict[str, Any]],
+    output_path: str | Path,
+) -> None:
+    """Write formatted verification rows to a JSON file."""
+    Path(output_path).write_text(
+        render_verification_results_json(rows),
+        encoding="utf-8",
+    )

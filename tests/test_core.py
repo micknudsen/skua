@@ -1,7 +1,11 @@
+import json
+
 from skua.core import (
     format_verification_results,
+    render_verification_results_json,
     verify_snv_variant,
     verify_snv_variants_from_vcf,
+    write_verification_results_json,
 )
 from skua.evidence import AggregatedEvidence, UnusableReason
 from tests.helpers import FakeAlignmentFile, FakeRead, build_linear_pairs
@@ -196,3 +200,48 @@ def test_verify_and_format_from_vcf_end_to_end(tmp_path) -> None:
             "unusable_by_reason": {"low_mapq": 1},
         }
     ]
+
+
+def test_render_verification_results_json_returns_json_text() -> None:
+    rows = [
+        {
+            "contig": "chr1",
+            "pos1": 106,
+            "ref": "A",
+            "alt": "T",
+            "alt_forward": 1,
+            "alt_reverse": 0,
+            "non_alt_forward": 0,
+            "non_alt_reverse": 1,
+            "usable": 2,
+            "unusable": 1,
+            "unusable_by_reason": {"low_mapq": 1},
+        }
+    ]
+
+    payload = render_verification_results_json(rows)
+
+    assert json.loads(payload) == rows
+
+
+def test_write_verification_results_json_writes_payload_to_file(tmp_path) -> None:
+    rows = [
+        {
+            "contig": "chr1",
+            "pos1": 106,
+            "ref": "A",
+            "alt": "T",
+            "alt_forward": 1,
+            "alt_reverse": 0,
+            "non_alt_forward": 0,
+            "non_alt_reverse": 1,
+            "usable": 2,
+            "unusable": 1,
+            "unusable_by_reason": {"low_mapq": 1},
+        }
+    ]
+    output_path = tmp_path / "verification.json"
+
+    write_verification_results_json(rows, output_path)
+
+    assert json.loads(output_path.read_text(encoding="utf-8")) == rows
