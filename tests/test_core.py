@@ -131,3 +131,68 @@ def test_format_verification_results_returns_json_ready_records() -> None:
             "unusable_by_reason": {"low_mapq": 2},
         }
     ]
+
+
+def test_verify_and_format_from_vcf_end_to_end(tmp_path) -> None:
+    reads = [
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=False,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+        FakeRead(
+            mapping_quality=5,
+            is_reverse=True,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+        FakeRead(
+            mapping_quality=60,
+            is_reverse=True,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
+    ]
+    alignment_file = FakeAlignmentFile(reads)
+
+    vcf_path = tmp_path / "input.vcf"
+    vcf_path.write_text(
+        "\n".join(
+            [
+                "##fileformat=VCFv4.2",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
+                "chr1\t200\t.\tA\tAT\t.\tPASS\t.",
+            ]
+        )
+        + "\n"
+    )
+
+    rows = format_verification_results(
+        verify_snv_variants_from_vcf(
+            alignment_file,
+            vcf_path,
+            min_baseq=20,
+            min_mapq=20,
+        )
+    )
+
+    assert rows == [
+        {
+            "contig": "chr1",
+            "pos1": 106,
+            "ref": "A",
+            "alt": "T",
+            "alt_forward": 1,
+            "alt_reverse": 0,
+            "non_alt_forward": 0,
+            "non_alt_reverse": 1,
+            "usable": 2,
+            "unusable": 1,
+            "unusable_by_reason": {"low_mapq": 1},
+        }
+    ]
