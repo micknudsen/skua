@@ -1,5 +1,5 @@
 from skua.evidence import AggregatedEvidence
-from skua.stats import Statistics, compute_stats
+from skua.stats import Stats, compute_stats
 
 
 def test_compute_stats_returns_typed_background_and_score() -> None:
@@ -24,7 +24,7 @@ def test_compute_stats_returns_typed_background_and_score() -> None:
 
     stats = compute_stats(case_evidence, normal_evidence)
 
-    assert isinstance(stats, Statistics)
+    assert isinstance(stats, Stats)
     assert stats.case_counts["alt_forward"] == 8
     assert stats.normal_counts["non_alt_forward"] == 9
     assert stats.background_rate_by_channel["alt_forward"] == 0.05

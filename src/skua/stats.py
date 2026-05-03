@@ -15,7 +15,7 @@ _CHANNELS = (
 
 
 @dataclass(frozen=True)
-class Statistics:
+class Stats:
     """Typed strand-aware summary for case vs panel-of-normals background."""
 
     case_counts: dict[str, int]
@@ -58,7 +58,7 @@ def compute_stats(
     prior_variant_probability: float = 0.5,
     mu_min: float = 1e-6,
     mu_max: float = 1 - 1e-6,
-) -> Statistics:
+) -> Stats:
     """Compute a Shearwater-style beta-binomial Bayes-factor summary.
 
     The Bayes factor is oriented as artifact-vs-variant (null/alternative),
@@ -152,7 +152,7 @@ def compute_stats(
     odds_variant = prior_variant_probability / (1.0 - prior_variant_probability)
     posterior_probability = odds_variant / (bayes_factor + odds_variant)
 
-    return Statistics(
+    return Stats(
         case_counts=case_counts,
         normal_counts=normal_counts,
         background_rate_by_channel=background_rate_by_channel,
