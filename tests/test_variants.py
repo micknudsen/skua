@@ -1,6 +1,6 @@
 import pytest
 
-from skua.variants import Variant, parse_vcf_snv_line
+from skua.variants import Variant, parse_vcf_snv_line, read_vcf_snv_file
 
 
 def test_variant_from_vcf_fields_converts_pos1_to_pos0() -> None:
@@ -46,3 +46,23 @@ def test_parse_vcf_snv_line_skips_non_snv_records() -> None:
 
 def test_parse_vcf_snv_line_skips_multiallelic_records() -> None:
     assert parse_vcf_snv_line("chr1\t106\t.\tA\tT,C\t.\tPASS\t.") is None
+
+
+def test_read_vcf_snv_file_yields_snv_records_only(tmp_path) -> None:
+    vcf_path = tmp_path / "input.vcf"
+    vcf_path.write_text(
+        "\n".join(
+            [
+                "##fileformat=VCFv4.2",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
+                "chr1\t200\t.\tA\tAT\t.\tPASS\t.",
+                "chr1\t300\t.\tC\tG,T\t.\tPASS\t.",
+            ]
+        )
+        + "\n"
+    )
+
+    variants = list(read_vcf_snv_file(vcf_path))
+
+    assert variants == [Variant(contig="chr1", ref_pos0=105, ref="A", alt="T")]
