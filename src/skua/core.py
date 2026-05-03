@@ -145,28 +145,6 @@ def render_verification_results_json(rows: Iterable[dict[str, Any]]) -> str:
     return json.dumps(list(rows), indent=2)
 
 
-def render_verification_results_tsv(rows: Iterable[dict[str, Any]]) -> str:
-    """Render formatted verification rows as TSV text."""
-    columns = [
-        "contig",
-        "pos1",
-        "ref",
-        "alt",
-        "case",
-    ]
-    lines = ["\t".join(columns)]
-    for row in rows:
-        serialized_row: list[str] = []
-        for column in columns:
-            value = row[column]
-            if column == "case":
-                serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
-            else:
-                serialized_row.append(str(value))
-        lines.append("\t".join(serialized_row))
-    return "\n".join(lines) + "\n"
-
-
 def write_verification_results_json(
     rows: Iterable[dict[str, Any]],
     output_path: str | Path,
@@ -227,28 +205,6 @@ def verify_snv_vcf_to_json(
     return _render_and_optionally_write(
         rows,
         renderer=render_verification_results_json,
-        output_path=output_path,
-    )
-
-
-def verify_snv_vcf_to_tsv(
-    alignment_file: Any,
-    vcf_path: str | Path,
-    *,
-    output_path: str | Path | None = None,
-    min_baseq: int = 20,
-    min_mapq: int = 20,
-) -> str:
-    """Run SNV verification from VCF and return TSV output, optionally writing to file."""
-    rows = _build_verification_rows(
-        alignment_file,
-        vcf_path,
-        min_baseq=min_baseq,
-        min_mapq=min_mapq,
-    )
-    return _render_and_optionally_write(
-        rows,
-        renderer=render_verification_results_tsv,
         output_path=output_path,
     )
 
@@ -326,30 +282,6 @@ def format_verification_results_with_normals(
     return rows
 
 
-def render_verification_results_tsv_with_normals(rows: Iterable[dict[str, Any]]) -> str:
-    """Render formatted PON verification rows as TSV text."""
-    columns = [
-        "contig",
-        "pos1",
-        "ref",
-        "alt",
-        "case",
-        "normal",
-        "statistics",
-    ]
-    lines = ["\t".join(columns)]
-    for row in rows:
-        serialized_row: list[str] = []
-        for column in columns:
-            value = row[column]
-            if column in {"case", "normal", "statistics"}:
-                serialized_row.append(json.dumps(value, sort_keys=True, separators=(",", ":")))
-            else:
-                serialized_row.append(str(value))
-        lines.append("\t".join(serialized_row))
-    return "\n".join(lines) + "\n"
-
-
 def _build_verification_rows_with_normals(
     alignment_file: Any,
     vcf_path: str | Path,
@@ -397,28 +329,3 @@ def verify_snv_vcf_to_json_with_normals(
     )
 
 
-def verify_snv_vcf_to_tsv_with_normals(
-    alignment_file: Any,
-    vcf_path: str | Path,
-    *,
-    normal_alignments: list[Any] | None = None,
-    output_path: str | Path | None = None,
-    min_baseq: int = 20,
-    min_mapq: int = 20,
-) -> str:
-    """Run PON SNV verification from VCF and return TSV output, optionally writing to file."""
-    if normal_alignments is None:
-        normal_alignments = []
-
-    rows = _build_verification_rows_with_normals(
-        alignment_file,
-        vcf_path,
-        normal_alignments=normal_alignments,
-        min_baseq=min_baseq,
-        min_mapq=min_mapq,
-    )
-    return _render_and_optionally_write(
-        rows,
-        renderer=render_verification_results_tsv_with_normals,
-        output_path=output_path,
-    )

@@ -3,8 +3,6 @@ import json
 from skua.core import (
     format_verification_results,
     render_verification_results_json,
-    render_verification_results_tsv,
-    verify_snv_vcf_to_tsv,
     verify_snv_vcf_to_json,
     verify_snv_variant,
     verify_snv_variant_with_normals,
@@ -259,33 +257,6 @@ def test_write_verification_results_json_writes_payload_to_file(tmp_path) -> Non
     assert json.loads(output_path.read_text(encoding="utf-8")) == rows
 
 
-def test_render_verification_results_tsv_returns_tsv_text() -> None:
-    rows = [
-        {
-            "contig": "chr1",
-            "pos1": 106,
-            "ref": "A",
-            "alt": "T",
-            "case": {
-                "alt_forward": 1,
-                "alt_reverse": 0,
-                "non_alt_forward": 0,
-                "non_alt_reverse": 1,
-                "usable": 2,
-                "unusable": 1,
-                "unusable_by_reason": {"low_mapq": 1},
-            },
-        }
-    ]
-
-    payload = render_verification_results_tsv(rows)
-
-    assert payload == (
-        "contig\tpos1\tref\talt\tcase\n"
-        "chr1\t106\tA\tT\t{\"alt_forward\":1,\"alt_reverse\":0,\"non_alt_forward\":0,\"non_alt_reverse\":1,\"unusable\":1,\"unusable_by_reason\":{\"low_mapq\":1},\"usable\":2}\n"
-    )
-
-
 def test_verify_snv_vcf_to_json_returns_payload_and_writes_file(tmp_path) -> None:
     reads = [
         FakeRead(
@@ -346,55 +317,6 @@ def test_verify_snv_vcf_to_json_returns_payload_and_writes_file(tmp_path) -> Non
     ]
     assert json.loads(payload) == expected_rows
     assert json.loads(output_path.read_text(encoding="utf-8")) == expected_rows
-
-
-def test_verify_snv_vcf_to_tsv_returns_payload_and_writes_file(tmp_path) -> None:
-    reads = [
-        FakeRead(
-            mapping_quality=60,
-            is_reverse=False,
-            query_sequence="AAAAATAAAA",
-            query_qualities=[35] * 10,
-            aligned_pairs=build_linear_pairs(10, 100),
-        ),
-        FakeRead(
-            mapping_quality=60,
-            is_reverse=True,
-            query_sequence="AAAAAAAAAA",
-            query_qualities=[35] * 10,
-            aligned_pairs=build_linear_pairs(10, 100),
-        ),
-    ]
-    alignment_file = FakeAlignmentFile(reads)
-
-    vcf_path = tmp_path / "input.vcf"
-    vcf_path.write_text(
-        "\n".join(
-            [
-                "##fileformat=VCFv4.2",
-                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
-                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
-                "chr1\t200\t.\tA\tAT\t.\tPASS\t.",
-            ]
-        )
-        + "\n"
-    )
-    output_path = tmp_path / "verification.tsv"
-
-    payload = verify_snv_vcf_to_tsv(
-        alignment_file,
-        vcf_path,
-        output_path=output_path,
-        min_baseq=20,
-        min_mapq=20,
-    )
-
-    expected_payload = (
-        "contig\tpos1\tref\talt\tcase\n"
-        "chr1\t106\tA\tT\t{\"alt_forward\":1,\"alt_reverse\":0,\"non_alt_forward\":0,\"non_alt_reverse\":1,\"unusable\":0,\"unusable_by_reason\":{},\"usable\":2}\n"
-    )
-    assert payload == expected_payload
-    assert output_path.read_text(encoding="utf-8") == expected_payload
 
 
 def test_verify_snv_variant_with_normals_returns_case_and_normal_evidence() -> None:
@@ -531,56 +453,3 @@ def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> No
     }
 
 
-def test_verify_snv_vcf_to_tsv_with_normals_returns_pon_payload(tmp_path) -> None:
-    from skua.core import verify_snv_vcf_to_tsv_with_normals
-
-    case_reads = [
-        FakeRead(
-            mapping_quality=60,
-            is_reverse=False,
-            query_sequence="AAAAATAAAA",
-            query_qualities=[35] * 10,
-            aligned_pairs=build_linear_pairs(10, 100),
-        ),
-    ]
-    case_alignment = FakeAlignmentFile(case_reads)
-
-    normal_reads = [
-        FakeRead(
-            mapping_quality=60,
-            is_reverse=False,
-            query_sequence="AAAAAAAAAA",
-            query_qualities=[35] * 10,
-            aligned_pairs=build_linear_pairs(10, 100),
-        ),
-    ]
-    normal_alignment = FakeAlignmentFile(normal_reads)
-
-    vcf_path = tmp_path / "input.vcf"
-    vcf_path.write_text(
-        "\n".join(
-            [
-                "##fileformat=VCFv4.2",
-                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
-                "chr1\t106\t.\tA\tT\t.\tPASS\t.",
-            ]
-        )
-        + "\n"
-    )
-
-    payload = verify_snv_vcf_to_tsv_with_normals(
-        case_alignment,
-        vcf_path,
-        normal_alignments=[normal_alignment],
-        min_baseq=20,
-        min_mapq=20,
-    )
-
-    lines = payload.strip().split("\n")
-    assert lines[0].startswith("contig\tpos1\tref\talt")
-    assert "case" in lines[0]
-    assert "normal" in lines[0]
-    assert "normals_with_alt" not in lines[0]
-    assert "normals_with_ref_only" not in lines[0]
-    assert "statistics" in lines[0]
-    assert "chr1\t106\tA\tT" in lines[1]

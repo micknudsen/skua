@@ -8,8 +8,6 @@ import pysam
 from .core import (
     verify_snv_vcf_to_json,
     verify_snv_vcf_to_json_with_normals,
-    verify_snv_vcf_to_tsv,
-    verify_snv_vcf_to_tsv_with_normals,
 )
 
 
@@ -22,12 +20,6 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--vcf", required=True, help="Input VCF path")
     verify_parser.add_argument("--alignment", required=True, help="Input BAM/CRAM path")
     verify_parser.add_argument("--reference", help="Reference FASTA path (required for CRAM)")
-    verify_parser.add_argument(
-        "--format",
-        choices=["json", "tsv"],
-        default="json",
-        help="Output format",
-    )
     verify_parser.add_argument("--output", help="Optional output JSON path")
     verify_parser.add_argument(
         "--normal-list",
@@ -74,43 +66,22 @@ def main(argv: list[str] | None = None) -> int:
         try:
             with pysam.AlignmentFile(args.alignment, "rb", **alignment_kwargs) as alignment_file:
                 if normal_paths:
-                    # Use PON verification functions
-                    if args.format == "tsv":
-                        payload = verify_snv_vcf_to_tsv_with_normals(
-                            alignment_file,
-                            Path(args.vcf),
-                            normal_alignments=normal_alignments,
-                            output_path=args.output,
-                            min_baseq=args.min_baseq,
-                            min_mapq=args.min_mapq,
-                        )
-                    else:
-                        payload = verify_snv_vcf_to_json_with_normals(
-                            alignment_file,
-                            Path(args.vcf),
-                            normal_alignments=normal_alignments,
-                            output_path=args.output,
-                            min_baseq=args.min_baseq,
-                            min_mapq=args.min_mapq,
-                        )
+                    payload = verify_snv_vcf_to_json_with_normals(
+                        alignment_file,
+                        Path(args.vcf),
+                        normal_alignments=normal_alignments,
+                        output_path=args.output,
+                        min_baseq=args.min_baseq,
+                        min_mapq=args.min_mapq,
+                    )
                 else:
-                    # Use standard verification functions
-                    if args.format == "tsv":
-                        payload = verify_snv_vcf_to_tsv(
-                            alignment_file,
-                            Path(args.vcf),
-                            output_path=args.output,
-                            min_baseq=args.min_baseq,
-                            min_mapq=args.min_mapq,
-                        )
-                    else:
-                        payload = verify_snv_vcf_to_json(
-                            alignment_file,
-                            Path(args.vcf),
-                            output_path=args.output,
-                            min_baseq=args.min_baseq,
-                            min_mapq=args.min_mapq,
-                        )
+                    payload = verify_snv_vcf_to_json(
+                        alignment_file,
+                        Path(args.vcf),
+                        output_path=args.output,
+                        min_baseq=args.min_baseq,
+                        min_mapq=args.min_mapq,
+                    )
         finally:
             for normal_alignment in normal_alignments:
                 normal_alignment.close()
