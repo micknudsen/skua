@@ -245,6 +245,7 @@ def format_verification_results_with_normals(
         stats = compute_stats(
             evidence,
             normal_aggregate_evidence,
+            per_sample_evidences=pon_result["normal_evidences"],
         )
         rows.append(
             {

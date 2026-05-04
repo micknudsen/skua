@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import math
+import sys
 
 from .evidence import AggregatedEvidence
 
@@ -49,11 +50,82 @@ def _logbb(x: int, n: int, mu_scaled: float, disp: float) -> float:
     return _log_beta(x + mu_scaled, n - x - mu_scaled + disp) - _log_beta(mu_scaled, disp - mu_scaled)
 
 
+def estimate_rho(
+    per_sample_evidences: list[AggregatedEvidence],
+    *,
+    truncate: float = 0.1,
+    rho_min: float = 1e-4,
+    rho_max: float = 0.1,
+    pseudo: float = sys.float_info.epsilon,
+) -> float:
+    """Estimate beta-binomial overdispersion (rho) from per-sample PON evidence.
+
+    Implements the method-of-moments estimator from Shearwater's estimateRho(),
+    applied to the combined (forward + reverse) alt channel across PON samples.
+    Returns rho bounded to [rho_min, rho_max].
+    """
+    if len(per_sample_evidences) < 2:
+        return rho_min
+
+    # Per-sample combined alt counts and total depths (combined across strands)
+    x_vals = [s.alt_forward + s.alt_reverse for s in per_sample_evidences]
+    n_vals = [
+        s.alt_forward + s.alt_reverse + s.non_alt_forward + s.non_alt_reverse
+        for s in per_sample_evidences
+    ]
+    S = len(per_sample_evidences)
+    total_n = sum(n_vals)
+
+    # Per-sample rates with pseudocount
+    mu_vals = [(x_vals[i] + pseudo) / (n_vals[i] + pseudo) for i in range(S)]
+
+    # Truncation filter: exclude samples with high background rate
+    ix = [mu_vals[i] < truncate for i in range(S)]
+    N = sum(ix)
+
+    if N < 2:
+        return rho_min
+
+    # Pooled background rate (denominator uses unfiltered total depth, matching R)
+    Xix = sum(x_vals[i] for i in range(S) if ix[i])
+    nu = (Xix + pseudo) / (total_n + pseudo)
+
+    # Weighted sample variance (weights = per-sample total depth for included samples)
+    n_ix = [n_vals[i] for i in range(S) if ix[i]]
+    mu_ix = [mu_vals[i] for i in range(S) if ix[i]]
+    sum_nix = sum(n_ix)
+
+    if sum_nix == 0 or N < 2:
+        return rho_min
+
+    s2 = (
+        N
+        * sum(n_ix[k] * (mu_ix[k] - nu) ** 2 for k in range(N))
+        / ((N - 1) * sum_nix)
+    )
+
+    # Method-of-moments beta-binomial rho estimate
+    sum_inv_nix = sum(1.0 / n_ix[k] for k in range(N) if n_ix[k] > 0)
+    denom = N - sum_inv_nix
+    if denom <= 0:
+        return rho_min
+
+    rho_hat = (N * (s2 / (nu * (1.0 - nu))) - sum_inv_nix) / denom
+
+    # Bound to [0,1] then [rho_min, rho_max]; fall back to rho_min on NaN
+    if not math.isfinite(rho_hat):
+        return rho_min
+    rho_hat = _bound(rho_hat, 0.0, 1.0)
+    rho_hat = _bound(rho_hat, rho_min, rho_max)
+    return rho_hat
+
+
 def compute_stats(
     case_evidence: AggregatedEvidence,
     normal_evidence: AggregatedEvidence,
     *,
     rho: float = 1e-4,
+    per_sample_evidences: list[AggregatedEvidence] | None = None,
     pseudocount: float = 0.5,
     prior_variant_probability: float = 0.5,
     mu_min: float = 1e-6,
@@ -65,7 +137,13 @@ def compute_stats(
     consistent with the original deepSNV Shearwater code path. The reported
     posterior probability matches Shearwater's posterior for the null/artifact
     model M0, so lower values indicate stronger evidence for a true variant.
+
+    When ``per_sample_evidences`` is supplied, rho is estimated from the
+    per-sample PON evidence using the Shearwater method-of-moments estimator
+    (``estimate_rho``), replacing the fixed ``rho`` default.
     """
+    if per_sample_evidences is not None:
+        rho = estimate_rho(per_sample_evidences)
     case_counts = {
         "alt_forward": case_evidence.alt_forward,
         "alt_reverse": case_evidence.alt_reverse,
