@@ -1,5 +1,6 @@
 from skua.evidence import AggregatedEvidence
 from skua.stats import Stats, compute_stats, estimate_rho
+import sys
 
 
 def test_compute_stats_returns_typed_background_and_score() -> None:
@@ -32,7 +33,7 @@ def test_compute_stats_returns_typed_background_and_score() -> None:
     assert stats.bayes_factor >= 0.0
     assert 0.0 <= stats.artifact_posterior <= 1.0
     assert stats.dispersion_rho == 1e-4
-    assert stats.pseudocount == 0.5
+    assert stats.pseudocount == sys.float_info.epsilon
 
 
 def test_compute_stats_is_stable_for_zero_depth() -> None:
@@ -64,7 +65,7 @@ def test_compute_stats_is_stable_for_zero_depth() -> None:
     assert stats.log_bayes_factor_artifact_vs_variant == 0.0
     assert stats.artifact_posterior == 0.5
     assert stats.dispersion_rho == 1e-4
-    assert stats.pseudocount == 0.5
+    assert stats.pseudocount == sys.float_info.epsilon
 
 
 def test_compute_stats_null_posterior_decreases_with_stronger_signal() -> None:

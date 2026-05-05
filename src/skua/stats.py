@@ -127,7 +127,7 @@ def compute_stats(
     rho: float = 1e-4,
     per_sample_evidences: list[AggregatedEvidence] | None = None,
     truncate: float = 0.1,
-    pseudocount: float = 0.5,
+    pseudocount: float = sys.float_info.epsilon,
     prior_variant_probability: float = 0.5,
     mu_min: float = 1e-6,
     mu_max: float = 1 - 1e-6,
