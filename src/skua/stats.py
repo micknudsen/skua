@@ -81,7 +81,6 @@ def estimate_rho(
         [sample.non_alt_forward + sample.non_alt_reverse for sample in per_sample_evidences],
     ]
     total_depth_all = sum(total_depth_by_sample)
-    total_by_channel = [sum(channel_counts) for channel_counts in x_by_channel]
 
     rho_by_channel: list[float] = []
     for channel_index in range(ncol):
