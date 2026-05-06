@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import sys
 from typing import Any
 from typing import Callable
 from typing import Iterable
@@ -241,7 +242,7 @@ def format_verification_results_with_normals(
     rows: list[dict[str, Any]] = []
     for variant, pon_result in results:
         truncate = 0.1
-        epsilon = 2.220446049250313e-16
+        epsilon = sys.float_info.epsilon
         evidence = pon_result["case_evidence"]
         per_sample_evidences = pon_result["normal_evidences"]
 
