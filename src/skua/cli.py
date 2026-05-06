@@ -11,14 +11,38 @@ from .core import (
 )
 
 
+class OptionalDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """Show defaults only for non-required options with concrete defaults."""
+
+    def _get_help_string(self, action: argparse.Action) -> str:
+        help_text = action.help
+        if help_text is None:
+            help_text = ""
+        if (
+            "%(default)" not in help_text
+            and action.default is not argparse.SUPPRESS
+            and action.default is not None
+            and not action.required
+        ):
+            help_text += " (default: %(default)s)"
+        return help_text
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
-    parser = argparse.ArgumentParser(prog="skua")
+    parser = argparse.ArgumentParser(
+        prog="skua",
+        formatter_class=OptionalDefaultsHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    verify_parser = subparsers.add_parser("verify", help="Verify SNV evidence from VCF and BAM/CRAM")
-    verify_parser.add_argument("--vcf", required=True, help="Input VCF path")
-    verify_parser.add_argument("--alignment", required=True, help="Input BAM/CRAM path")
+    verify_parser = subparsers.add_parser(
+        "verify",
+        help="Verify SNV evidence from VCF and BAM/CRAM",
+        formatter_class=OptionalDefaultsHelpFormatter,
+    )
+    verify_parser.add_argument("--vcf", required=True, help="Input VCF path (required)")
+    verify_parser.add_argument("--alignment", required=True, help="Input BAM/CRAM path (required)")
     verify_parser.add_argument("--reference", help="Reference FASTA path (required for CRAM)")
     verify_parser.add_argument("--output", help="Optional output JSON path")
     verify_parser.add_argument(
