@@ -128,14 +128,16 @@ def test_format_verification_results_returns_json_ready_records() -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "case": {
-                "alt_forward": 1,
-                "alt_reverse": 2,
-                "non_alt_forward": 3,
-                "non_alt_reverse": 4,
-                "usable": 10,
-                "unusable": 2,
-                "unusable_by_reason": {"low_mapq": 2},
+            "counts": {
+                "case": {
+                    "alt_forward": 1,
+                    "alt_reverse": 2,
+                    "non_alt_forward": 3,
+                    "non_alt_reverse": 4,
+                    "usable": 10,
+                    "unusable": 2,
+                    "unusable_by_reason": {"low_mapq": 2},
+                },
             },
         }
     ]
@@ -195,14 +197,16 @@ def test_verify_and_format_from_vcf_end_to_end(tmp_path) -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "case": {
-                "alt_forward": 1,
-                "alt_reverse": 0,
-                "non_alt_forward": 0,
-                "non_alt_reverse": 1,
-                "usable": 2,
-                "unusable": 1,
-                "unusable_by_reason": {"low_mapq": 1},
+            "counts": {
+                "case": {
+                    "alt_forward": 1,
+                    "alt_reverse": 0,
+                    "non_alt_forward": 0,
+                    "non_alt_reverse": 1,
+                    "usable": 2,
+                    "unusable": 1,
+                    "unusable_by_reason": {"low_mapq": 1},
+                },
             },
         }
     ]
@@ -215,14 +219,16 @@ def test_render_verification_results_json_returns_json_text() -> None:
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "case": {
-                "alt_forward": 1,
-                "alt_reverse": 0,
-                "non_alt_forward": 0,
-                "non_alt_reverse": 1,
-                "usable": 2,
-                "unusable": 1,
-                "unusable_by_reason": {"low_mapq": 1},
+            "counts": {
+                "case": {
+                    "alt_forward": 1,
+                    "alt_reverse": 0,
+                    "non_alt_forward": 0,
+                    "non_alt_reverse": 1,
+                    "usable": 2,
+                    "unusable": 1,
+                    "unusable_by_reason": {"low_mapq": 1},
+                },
             },
         }
     ]
@@ -304,14 +310,16 @@ def test_verify_snv_vcf_to_json_returns_payload_and_writes_file(tmp_path) -> Non
             "pos1": 106,
             "ref": "A",
             "alt": "T",
-            "case": {
-                "alt_forward": 1,
-                "alt_reverse": 0,
-                "non_alt_forward": 0,
-                "non_alt_reverse": 1,
-                "usable": 2,
-                "unusable": 0,
-                "unusable_by_reason": {},
+            "counts": {
+                "case": {
+                    "alt_forward": 1,
+                    "alt_reverse": 0,
+                    "non_alt_forward": 0,
+                    "non_alt_reverse": 1,
+                    "usable": 2,
+                    "unusable": 0,
+                    "unusable_by_reason": {},
+                },
             },
         }
     ]
@@ -431,35 +439,38 @@ def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> No
     assert len(result) == 1
     assert result[0]["contig"] == "chr1"
     assert result[0]["pos1"] == 106
-    assert result[0]["normal"]["alt_forward"] == 0
-    assert result[0]["normal"]["alt_reverse"] == 0
-    assert result[0]["normal"]["non_alt_forward"] == 1
-    assert result[0]["normal"]["non_alt_reverse"] == 0
-    assert result[0]["normal"]["usable"] == 1
-    assert result[0]["normal"]["unusable"] == 0
-    assert result[0]["normal"]["unusable_by_reason"] == {}
-    assert result[0]["case"]["alt_forward"] == 1
-    assert result[0]["case"]["alt_reverse"] == 0
-    assert result[0]["case"]["non_alt_forward"] == 0
-    assert result[0]["case"]["non_alt_reverse"] == 0
-    assert result[0]["case"]["usable"] == 1
-    assert result[0]["case"]["unusable"] == 0
-    assert result[0]["case"]["unusable_by_reason"] == {}
-    assert result[0]["bayes_factor"] >= 0.0
-    assert 0.0 <= result[0]["artifact_posterior"] <= 1.0
-    assert result[0]["rho"] == 1e-4
-    assert result[0]["normal_samples_used"] == 1
-    assert set(
-        key
-        for key in result[0].keys()
-        if key in {"bayes_factor", "artifact_posterior", "rho", "normal_samples_used"}
-    ) == {
-        "bayes_factor",
+    assert result[0]["counts"]["normal"]["alt_forward"] == 0
+    assert result[0]["counts"]["normal"]["alt_reverse"] == 0
+    assert result[0]["counts"]["normal"]["non_alt_forward"] == 1
+    assert result[0]["counts"]["normal"]["non_alt_reverse"] == 0
+    assert result[0]["counts"]["normal"]["usable"] == 1
+    assert result[0]["counts"]["normal"]["unusable"] == 0
+    assert result[0]["counts"]["normal"]["unusable_by_reason"] == {}
+    assert result[0]["counts"]["case"]["alt_forward"] == 1
+    assert result[0]["counts"]["case"]["alt_reverse"] == 0
+    assert result[0]["counts"]["case"]["non_alt_forward"] == 0
+    assert result[0]["counts"]["case"]["non_alt_reverse"] == 0
+    assert result[0]["counts"]["case"]["usable"] == 1
+    assert result[0]["counts"]["case"]["unusable"] == 0
+    assert result[0]["counts"]["case"]["unusable_by_reason"] == {}
+    assert 0.0 <= result[0]["stats"]["artifact_posterior"] <= 1.0
+    assert result[0]["stats"]["bayes_factor"] >= 0.0
+    assert result[0]["stats"]["dispersion_factor"] == 1e-4
+    assert result[0]["stats"]["pon_size"] == 1
+    assert list(result[0].keys()) == [
+        "contig",
+        "pos1",
+        "ref",
+        "alt",
+        "stats",
+        "counts",
+    ]
+    assert list(result[0]["stats"].keys()) == [
         "artifact_posterior",
-        "rho",
-        "normal_samples_used",
-    }
-    assert "stats" not in result[0]
+        "bayes_factor",
+        "dispersion_factor",
+        "pon_size",
+    ]
 
 
 def test_format_verification_results_with_normals_excludes_truncated_normals() -> None:
@@ -516,9 +527,9 @@ def test_format_verification_results_with_normals_excludes_truncated_normals() -
         ]
     )
 
-    assert rows[0]["normal_samples_used"] == 1
-    assert rows[0]["normal"]["alt_forward"] == 1
-    assert rows[0]["normal"]["non_alt_forward"] == 99
-    assert rows[0]["normal"]["usable"] == 100
+    assert rows[0]["stats"]["pon_size"] == 1
+    assert rows[0]["counts"]["normal"]["alt_forward"] == 1
+    assert rows[0]["counts"]["normal"]["non_alt_forward"] == 99
+    assert rows[0]["counts"]["normal"]["usable"] == 100
 
 

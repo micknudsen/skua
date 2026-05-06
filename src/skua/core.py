@@ -124,16 +124,18 @@ def format_verification_results(
                 "pos1": variant.ref_pos0 + 1,
                 "ref": variant.ref,
                 "alt": variant.alt,
-                "case": {
-                    "alt_forward": evidence.alt_forward,
-                    "alt_reverse": evidence.alt_reverse,
-                    "non_alt_forward": evidence.non_alt_forward,
-                    "non_alt_reverse": evidence.non_alt_reverse,
-                    "usable": evidence.usable,
-                    "unusable": evidence.unusable,
-                    "unusable_by_reason": {
-                        reason.value: count
-                        for reason, count in evidence.unusable_by_reason.items()
+                "counts": {
+                    "case": {
+                        "alt_forward": evidence.alt_forward,
+                        "alt_reverse": evidence.alt_reverse,
+                        "non_alt_forward": evidence.non_alt_forward,
+                        "non_alt_reverse": evidence.non_alt_reverse,
+                        "usable": evidence.usable,
+                        "unusable": evidence.unusable,
+                        "unusable_by_reason": {
+                            reason.value: count
+                            for reason, count in evidence.unusable_by_reason.items()
+                        },
                     },
                 },
             }
@@ -269,32 +271,36 @@ def format_verification_results_with_normals(
                 "pos1": variant.ref_pos0 + 1,
                 "ref": variant.ref,
                 "alt": variant.alt,
-                "bayes_factor": stats.bayes_factor,
-                "artifact_posterior": stats.artifact_posterior,
-                "rho": stats.dispersion_rho,
-                "normal_samples_used": normal_samples_used,
-                "case": {
-                    "alt_forward": evidence.alt_forward,
-                    "alt_reverse": evidence.alt_reverse,
-                    "non_alt_forward": evidence.non_alt_forward,
-                    "non_alt_reverse": evidence.non_alt_reverse,
-                    "usable": evidence.usable,
-                    "unusable": evidence.unusable,
-                    "unusable_by_reason": {
-                        reason.value: count
-                        for reason, count in evidence.unusable_by_reason.items()
-                    },
+                "stats": {
+                    "artifact_posterior": stats.artifact_posterior,
+                    "bayes_factor": stats.bayes_factor,
+                    "dispersion_factor": stats.dispersion_rho,
+                    "pon_size": normal_samples_used,
                 },
-                "normal": {
-                    "alt_forward": normal_output_evidence.alt_forward,
-                    "alt_reverse": normal_output_evidence.alt_reverse,
-                    "non_alt_forward": normal_output_evidence.non_alt_forward,
-                    "non_alt_reverse": normal_output_evidence.non_alt_reverse,
-                    "usable": normal_output_evidence.usable,
-                    "unusable": normal_output_evidence.unusable,
-                    "unusable_by_reason": {
-                        reason.value: count
-                        for reason, count in normal_output_evidence.unusable_by_reason.items()
+                "counts": {
+                    "case": {
+                        "alt_forward": evidence.alt_forward,
+                        "alt_reverse": evidence.alt_reverse,
+                        "non_alt_forward": evidence.non_alt_forward,
+                        "non_alt_reverse": evidence.non_alt_reverse,
+                        "usable": evidence.usable,
+                        "unusable": evidence.unusable,
+                        "unusable_by_reason": {
+                            reason.value: count
+                            for reason, count in evidence.unusable_by_reason.items()
+                        },
+                    },
+                    "normal": {
+                        "alt_forward": normal_output_evidence.alt_forward,
+                        "alt_reverse": normal_output_evidence.alt_reverse,
+                        "non_alt_forward": normal_output_evidence.non_alt_forward,
+                        "non_alt_reverse": normal_output_evidence.non_alt_reverse,
+                        "usable": normal_output_evidence.usable,
+                        "unusable": normal_output_evidence.unusable,
+                        "unusable_by_reason": {
+                            reason.value: count
+                            for reason, count in normal_output_evidence.unusable_by_reason.items()
+                        },
                     },
                 },
             }
