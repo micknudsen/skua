@@ -9,7 +9,7 @@ from typing import Iterable
 from typing import Iterator
 
 from .evidence import AggregatedEvidence, collect_snv_evidence_from_alignment
-from .stats import compute_stats
+from .stats import aggregate_evidence, compute_stats, DEFAULT_TRUNCATE, truncated_normal_evidences
 from .variants import Variant, read_vcf_snv_file
 
 
@@ -237,56 +237,30 @@ def verify_snv_variants_from_vcf_with_normals(
 
 def format_verification_results_with_normals(
     results: Iterable[tuple[Variant, dict[str, Any]]],
+    *,
+    truncate: float = DEFAULT_TRUNCATE,
+    pseudocount: float = sys.float_info.epsilon,
+    prior_variant_probability: float = 0.5,
 ) -> list[dict[str, Any]]:
     """Convert PON verification results to JSON/tabular-ready row dictionaries."""
     rows: list[dict[str, Any]] = []
     for variant, pon_result in results:
-        truncate = 0.1
-        epsilon = sys.float_info.epsilon
         evidence = pon_result["case_evidence"]
         per_sample_evidences = pon_result["normal_evidences"]
 
-        normal_samples_included = [
-            sample
-            for sample in per_sample_evidences
-            if (
-                (
-                    sample.alt_forward
-                    + sample.alt_reverse
-                    + epsilon
-                )
-                /
-                (
-                    sample.alt_forward
-                    + sample.alt_reverse
-                    + sample.non_alt_forward
-                    + sample.non_alt_reverse
-                    + epsilon
-                )
-            )
-            < truncate
-        ]
-
-        normal_unusable_by_reason: dict[Any, int] = {}
-        for sample in normal_samples_included:
-            for reason, count in sample.unusable_by_reason.items():
-                normal_unusable_by_reason[reason] = normal_unusable_by_reason.get(reason, 0) + count
-
-        normal_output_evidence = AggregatedEvidence(
-            alt_forward=sum(sample.alt_forward for sample in normal_samples_included),
-            alt_reverse=sum(sample.alt_reverse for sample in normal_samples_included),
-            non_alt_forward=sum(sample.non_alt_forward for sample in normal_samples_included),
-            non_alt_reverse=sum(sample.non_alt_reverse for sample in normal_samples_included),
-            usable=sum(sample.usable for sample in normal_samples_included),
-            unusable=sum(sample.unusable for sample in normal_samples_included),
-            unusable_by_reason=normal_unusable_by_reason,
+        normal_samples_included = truncated_normal_evidences(
+            per_sample_evidences,
+            truncate=truncate,
         )
+        normal_output_evidence = aggregate_evidence(normal_samples_included)
 
         stats = compute_stats(
             evidence,
             normal_output_evidence,
             per_sample_evidences=per_sample_evidences,
             truncate=truncate,
+            pseudocount=pseudocount,
+            prior_variant_probability=prior_variant_probability,
         )
         normal_samples_used = len(normal_samples_included)
         rows.append(
@@ -335,6 +309,9 @@ def _build_verification_rows_with_normals(
     normal_alignments: list[Any] | None,
     min_baseq: int,
     min_mapq: int,
+    truncate: float,
+    pseudocount: float,
+    prior_variant_probability: float,
 ) -> list[dict[str, Any]]:
     """Build formatted PON verification rows from case + normal alignments and one VCF."""
     return format_verification_results_with_normals(
@@ -344,7 +321,10 @@ def _build_verification_rows_with_normals(
             normal_alignments=normal_alignments,
             min_baseq=min_baseq,
             min_mapq=min_mapq,
-        )
+        ),
+        truncate=truncate,
+        pseudocount=pseudocount,
+        prior_variant_probability=prior_variant_probability,
     )
 
 
@@ -356,6 +336,9 @@ def verify_snv_vcf_to_json_with_normals(
     output_path: str | Path | None = None,
     min_baseq: int = 20,
     min_mapq: int = 20,
+    truncate: float = DEFAULT_TRUNCATE,
+    pseudocount: float = sys.float_info.epsilon,
+    prior_variant_probability: float = 0.5,
 ) -> str:
     """Run PON SNV verification from VCF and return JSON output, optionally writing to file."""
     if normal_alignments is None:
@@ -367,6 +350,9 @@ def verify_snv_vcf_to_json_with_normals(
         normal_alignments=normal_alignments,
         min_baseq=min_baseq,
         min_mapq=min_mapq,
+        truncate=truncate,
+        pseudocount=pseudocount,
+        prior_variant_probability=prior_variant_probability,
     )
     return _render_and_optionally_write(
         rows,

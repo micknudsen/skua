@@ -14,6 +14,8 @@ _CHANNELS = (
     "non_alt_reverse",
 )
 
+DEFAULT_TRUNCATE = 0.1
+
 
 @dataclass(frozen=True)
 class Stats:
@@ -50,10 +52,57 @@ def _logbb(x: int, n: int, mu_scaled: float, disp: float) -> float:
     return _log_beta(x + mu_scaled, n - x - mu_scaled + disp) - _log_beta(mu_scaled, disp - mu_scaled)
 
 
+def truncated_normal_evidences(
+    per_sample_evidences: list[AggregatedEvidence],
+    *,
+    truncate: float = DEFAULT_TRUNCATE,
+    epsilon: float = sys.float_info.epsilon,
+) -> list[AggregatedEvidence]:
+    """Return per-sample normal evidences retained by the truncation rule."""
+    return [
+        sample
+        for sample in per_sample_evidences
+        if (
+            (
+                sample.alt_forward
+                + sample.alt_reverse
+                + epsilon
+            )
+            /
+            (
+                sample.alt_forward
+                + sample.alt_reverse
+                + sample.non_alt_forward
+                + sample.non_alt_reverse
+                + epsilon
+            )
+        )
+        < truncate
+    ]
+
+
+def aggregate_evidence(evidences: list[AggregatedEvidence]) -> AggregatedEvidence:
+    """Aggregate a list of evidence objects into one strand-aware summary."""
+    unusable_by_reason: dict = {}
+    for evidence in evidences:
+        for reason, count in evidence.unusable_by_reason.items():
+            unusable_by_reason[reason] = unusable_by_reason.get(reason, 0) + count
+
+    return AggregatedEvidence(
+        alt_forward=sum(evidence.alt_forward for evidence in evidences),
+        alt_reverse=sum(evidence.alt_reverse for evidence in evidences),
+        non_alt_forward=sum(evidence.non_alt_forward for evidence in evidences),
+        non_alt_reverse=sum(evidence.non_alt_reverse for evidence in evidences),
+        usable=sum(evidence.usable for evidence in evidences),
+        unusable=sum(evidence.unusable for evidence in evidences),
+        unusable_by_reason=unusable_by_reason,
+    )
+
+
 def estimate_rho(
     per_sample_evidences: list[AggregatedEvidence],
     *,
-    truncate: float = 0.1,
+    truncate: float = DEFAULT_TRUNCATE,
     rho_min: float = 1e-4,
     rho_max: float = 0.1,
     pseudo: float = sys.float_info.epsilon,
@@ -152,7 +201,7 @@ def compute_stats(
     *,
     rho: float = 1e-4,
     per_sample_evidences: list[AggregatedEvidence] | None = None,
-    truncate: float = 0.1,
+    truncate: float = DEFAULT_TRUNCATE,
     pseudocount: float = sys.float_info.epsilon,
     prior_variant_probability: float = 0.5,
     mu_min: float = 1e-6,
@@ -207,25 +256,15 @@ def compute_stats(
     N_bw = X_bw + normal_counts["non_alt_reverse"]
 
     if per_sample_evidences:
-        # Shearwater-style truncation: exclude high-background PON samples
-        # from the background pool used in Bayes-factor terms.
-        masked = []
-        for sample in per_sample_evidences:
-            sample_alt = sample.alt_forward + sample.alt_reverse
-            sample_depth = (
-                sample.alt_forward
-                + sample.alt_reverse
-                + sample.non_alt_forward
-                + sample.non_alt_reverse
-            )
-            sample_mu = (sample_alt + sys.float_info.epsilon) / (sample_depth + sys.float_info.epsilon)
-            if sample_mu < truncate:
-                masked.append(sample)
-
-        X_fw = sum(sample.alt_forward for sample in masked)
-        X_bw = sum(sample.alt_reverse for sample in masked)
-        N_fw = sum(sample.alt_forward + sample.non_alt_forward for sample in masked)
-        N_bw = sum(sample.alt_reverse + sample.non_alt_reverse for sample in masked)
+        masked = truncated_normal_evidences(
+            per_sample_evidences,
+            truncate=truncate,
+        )
+        masked_aggregate = aggregate_evidence(masked)
+        X_fw = masked_aggregate.alt_forward
+        X_bw = masked_aggregate.alt_reverse
+        N_fw = masked_aggregate.alt_forward + masked_aggregate.non_alt_forward
+        N_bw = masked_aggregate.alt_reverse + masked_aggregate.non_alt_reverse
 
     if case_total == 0:
         log_bayes_factor = 0.0

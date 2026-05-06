@@ -27,6 +27,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_parser.add_argument("--min-baseq", type=int, default=20, help="Minimum base quality")
     verify_parser.add_argument("--min-mapq", type=int, default=20, help="Minimum mapping quality")
+    verify_parser.add_argument(
+        "--truncate",
+        type=float,
+        default=0.1,
+        help="Truncation threshold for PON sample inclusion",
+    )
+    verify_parser.add_argument(
+        "--pseudocount",
+        type=float,
+        default=None,
+        help="Optional pseudocount for beta-binomial rate estimates",
+    )
+    verify_parser.add_argument(
+        "--prior-variant-probability",
+        type=float,
+        default=0.5,
+        help="Prior probability for the variant model",
+    )
 
     return parser
 
@@ -66,6 +84,12 @@ def main(argv: list[str] | None = None) -> int:
         try:
             with pysam.AlignmentFile(args.alignment, "rb", **alignment_kwargs) as alignment_file:
                 if normal_paths:
+                    pon_kwargs = {
+                        "truncate": args.truncate,
+                        "prior_variant_probability": args.prior_variant_probability,
+                    }
+                    if args.pseudocount is not None:
+                        pon_kwargs["pseudocount"] = args.pseudocount
                     payload = verify_snv_vcf_to_json_with_normals(
                         alignment_file,
                         Path(args.vcf),
@@ -73,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                         output_path=args.output,
                         min_baseq=args.min_baseq,
                         min_mapq=args.min_mapq,
+                        **pon_kwargs,
                     )
                 else:
                     payload = verify_snv_vcf_to_json(

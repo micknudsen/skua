@@ -235,6 +235,8 @@ def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_pat
             "output_path": None,
             "min_baseq": 20,
             "min_mapq": 20,
+            "truncate": 0.1,
+            "prior_variant_probability": 0.5,
         }
     ]
     assert capsys.readouterr().out == "{\"ok\": true}\n"
