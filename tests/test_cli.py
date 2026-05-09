@@ -24,10 +24,10 @@ def test_main_verify_prints_payload_without_output_path(monkeypatch, capsys) -> 
                 **kwargs,
             }
         )
-        return "{\"ok\": true}"
+        return "##fileformat=VCFv4.2\n"
 
     monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
-    monkeypatch.setattr(cli, "verify_snv_vcf_to_json", fake_verify)
+    monkeypatch.setattr(cli, "verify_snv_vcf_to_annotated_vcf", fake_verify)
 
     exit_code = cli.main(["verify", "--vcf", "input.vcf", "--alignment", "reads.bam"])
 
@@ -42,7 +42,7 @@ def test_main_verify_prints_payload_without_output_path(monkeypatch, capsys) -> 
             "min_mapq": 20,
         }
     ]
-    assert capsys.readouterr().out == "{\"ok\": true}\n"
+    assert capsys.readouterr().out == "##fileformat=VCFv4.2\n\n"
 
 
 def test_main_verify_uses_output_path_and_does_not_print(monkeypatch, capsys) -> None:
@@ -68,10 +68,10 @@ def test_main_verify_uses_output_path_and_does_not_print(monkeypatch, capsys) ->
                 **kwargs,
             }
         )
-        return "{\"ok\": true}"
+        return "##fileformat=VCFv4.2\n"
 
     monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
-    monkeypatch.setattr(cli, "verify_snv_vcf_to_json", fake_verify)
+    monkeypatch.setattr(cli, "verify_snv_vcf_to_annotated_vcf", fake_verify)
 
     exit_code = cli.main(
         [
@@ -81,7 +81,7 @@ def test_main_verify_uses_output_path_and_does_not_print(monkeypatch, capsys) ->
             "--alignment",
             "reads.bam",
             "--output",
-            "out.json",
+            "out.vcf.gz",
             "--min-baseq",
             "15",
             "--min-mapq",
@@ -95,7 +95,7 @@ def test_main_verify_uses_output_path_and_does_not_print(monkeypatch, capsys) ->
             "alignment_path": "reads.bam",
             "alignment_mode": "rb",
             "vcf_path": "input.vcf",
-            "output_path": "out.json",
+            "output_path": "out.vcf.gz",
             "min_baseq": 15,
             "min_mapq": 12,
         }
@@ -128,10 +128,10 @@ def test_main_verify_accepts_alignment_path_for_cram(monkeypatch, capsys) -> Non
                 **kwargs,
             }
         )
-        return "{\"ok\": true}"
+        return "##fileformat=VCFv4.2\n"
 
     monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
-    monkeypatch.setattr(cli, "verify_snv_vcf_to_json", fake_verify)
+    monkeypatch.setattr(cli, "verify_snv_vcf_to_annotated_vcf", fake_verify)
 
     exit_code = cli.main(
         [
@@ -157,7 +157,7 @@ def test_main_verify_accepts_alignment_path_for_cram(monkeypatch, capsys) -> Non
             "min_mapq": 20,
         }
     ]
-    assert capsys.readouterr().out == "{\"ok\": true}\n"
+    assert capsys.readouterr().out == "##fileformat=VCFv4.2\n\n"
 
 
 def test_main_verify_requires_reference_for_cram(capsys) -> None:
@@ -206,10 +206,14 @@ def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_pat
                 **{k: v for k, v in kwargs.items() if k != "normal_alignments"},
             }
         )
-        return "{\"ok\": true}"
+        return "##fileformat=VCFv4.2\n"
 
     monkeypatch.setattr(cli.pysam, "AlignmentFile", FakeAlignmentFile)
-    monkeypatch.setattr(cli, "verify_snv_vcf_to_json_with_normals", fake_verify_with_normals)
+    monkeypatch.setattr(
+        cli,
+        "verify_snv_vcf_to_annotated_vcf_with_normals",
+        fake_verify_with_normals,
+    )
 
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("normal1.bam\nnormal2.bam\n", encoding="utf-8")
@@ -239,10 +243,10 @@ def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_pat
             "prior_variant_probability": 0.5,
         }
     ]
-    assert capsys.readouterr().out == "{\"ok\": true}\n"
+    assert capsys.readouterr().out == "##fileformat=VCFv4.2\n\n"
 
 
-def test_main_verify_vcf_output_uses_annotated_vcf_function(monkeypatch, capsys) -> None:
+def test_main_verify_uses_annotated_vcf_function(monkeypatch, capsys) -> None:
     calls: list[dict[str, object]] = []
 
     class FakeAlignmentFile:
@@ -278,8 +282,6 @@ def test_main_verify_vcf_output_uses_annotated_vcf_function(monkeypatch, capsys)
             "input.vcf",
             "--alignment",
             "reads.bam",
-            "--output-format",
-            "vcf",
         ]
     )
 
@@ -297,7 +299,7 @@ def test_main_verify_vcf_output_uses_annotated_vcf_function(monkeypatch, capsys)
     assert capsys.readouterr().out == "##fileformat=VCFv4.2\n\n"
 
 
-def test_main_verify_vcf_output_with_normal_uses_annotated_pon_function(
+def test_main_verify_with_normal_uses_annotated_pon_function(
     monkeypatch,
     capsys,
     tmp_path,
@@ -349,8 +351,6 @@ def test_main_verify_vcf_output_with_normal_uses_annotated_pon_function(
             "case.bam",
             "--normal-list",
             str(normal_list_path),
-            "--output-format",
-            "vcf",
         ]
     )
 
@@ -368,3 +368,45 @@ def test_main_verify_vcf_output_with_normal_uses_annotated_pon_function(
         }
     ]
     assert capsys.readouterr().out == "##fileformat=VCFv4.2\n\n"
+
+
+def test_main_verify_rejects_removed_output_format_flag(capsys) -> None:
+    try:
+        cli.main(
+            [
+                "verify",
+                "--vcf",
+                "input.vcf",
+                "--alignment",
+                "reads.bam",
+                "--output-format",
+                "vcf",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected SystemExit for removed --output-format")
+
+    assert "unrecognized arguments: --output-format vcf" in capsys.readouterr().err
+
+
+def test_main_verify_rejects_output_path_with_non_vcf_suffix(capsys) -> None:
+    try:
+        cli.main(
+            [
+                "verify",
+                "--vcf",
+                "input.vcf",
+                "--alignment",
+                "reads.bam",
+                "--output",
+                "out.txt",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected SystemExit for invalid output extension")
+
+    assert "--output must end with .vcf or .vcf.gz" in capsys.readouterr().err

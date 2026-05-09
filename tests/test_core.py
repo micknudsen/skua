@@ -349,6 +349,13 @@ def test_verify_snv_vcf_to_annotated_vcf_writes_case_format_fields(tmp_path) -> 
             query_qualities=[35] * 10,
             aligned_pairs=build_linear_pairs(10, 100),
         ),
+        FakeRead(
+            mapping_quality=5,
+            is_reverse=True,
+            query_sequence="AAAAATAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
     ]
     alignment_file = FakeAlignmentFile(reads)
 
@@ -385,7 +392,7 @@ def test_verify_snv_vcf_to_annotated_vcf_writes_case_format_fields(tmp_path) -> 
         assert sample["SKUA_NON_ALT_FWD"] == 0
         assert sample["SKUA_NON_ALT_REV"] == 1
         assert sample["SKUA_USABLE"] == 2
-        assert sample["SKUA_UNUSABLE"] == 0
+        assert sample["SKUA_UNUSABLE"] == 1
 
 
 def test_verify_snv_vcf_to_annotated_vcf_supports_bgzipped_output(tmp_path) -> None:
@@ -456,6 +463,13 @@ def test_verify_snv_vcf_to_annotated_vcf_with_normals_writes_info_and_format(tmp
             query_qualities=[35] * 10,
             aligned_pairs=build_linear_pairs(10, 100),
         ),
+        FakeRead(
+            mapping_quality=5,
+            is_reverse=True,
+            query_sequence="AAAAAAAAAA",
+            query_qualities=[35] * 10,
+            aligned_pairs=build_linear_pairs(10, 100),
+        ),
     ]
     normal_alignment = FakeAlignmentFile(normal_reads)
 
@@ -492,13 +506,13 @@ def test_verify_snv_vcf_to_annotated_vcf_with_normals_writes_info_and_format(tmp
         assert 0.0 <= sample["SKUA_ARTIFACT_POSTERIOR"] <= 1.0
         assert sample["SKUA_BAYES_FACTOR"] >= 0.0
         assert record.info["SKUA_PON_SAMPLE_COUNT"] == 1
-        assert record.info["SKUA_N_ALT_FWD"] == 0
-        assert record.info["SKUA_N_ALT_REV"] == 0
-        assert record.info["SKUA_N_NON_ALT_FWD"] == 1
-        assert record.info["SKUA_N_NON_ALT_REV"] == 0
-        assert record.info["SKUA_N_USABLE"] == 1
-        assert record.info["SKUA_N_UNUSABLE"] == 0
-        assert record.info["SKUA_DISPERSION_FACTOR"] == pytest.approx(1e-4)
+        assert record.info["SKUA_PON_ALT_FWD"] == 0
+        assert record.info["SKUA_PON_ALT_REV"] == 0
+        assert record.info["SKUA_PON_NON_ALT_FWD"] == 1
+        assert record.info["SKUA_PON_NON_ALT_REV"] == 0
+        assert record.info["SKUA_PON_USABLE"] == 1
+        assert record.info["SKUA_PON_UNUSABLE"] == 1
+        assert record.info["SKUA_PON_DISPERSION_FACTOR"] == pytest.approx(1e-4)
 
 
 def test_verify_snv_variant_with_normals_returns_case_and_normal_evidence() -> None:
