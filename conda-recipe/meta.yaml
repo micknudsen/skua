@@ -20,6 +20,7 @@ requirements:
     - wheel
   run:
     - python >=3.10
+    - pysam >=0.22
 
 test:
   imports:
