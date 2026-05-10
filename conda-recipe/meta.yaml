@@ -25,7 +25,7 @@ test:
   imports:
     - skua
   commands:
-    - python -c "from skua import hello; assert hello('shearwater') == 'Hello, shearwater!'"
+    - skua verify --help
 
 about:
   home: https://github.com/micknudsen/skua
