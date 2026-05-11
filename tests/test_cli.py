@@ -1,11 +1,11 @@
 import skua.cli as cli
 
 
-def test_main_verify_requires_normal_list(capsys) -> None:
+def test_main_annotate_requires_normal_list(capsys) -> None:
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",
@@ -20,7 +20,7 @@ def test_main_verify_requires_normal_list(capsys) -> None:
     assert "the following arguments are required: --normal-list" in capsys.readouterr().err
 
 
-def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_path) -> None:
+def test_main_annotate_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_path) -> None:
     calls: list[dict[str, object]] = []
 
     class FakeAlignmentFile:
@@ -61,7 +61,7 @@ def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_pat
 
     exit_code = cli.main(
         [
-            "verify",
+            "annotate",
             "--vcf",
             "input.vcf",
             "--alignment",
@@ -87,7 +87,7 @@ def test_main_verify_with_normal_uses_pon_functions(monkeypatch, capsys, tmp_pat
     assert capsys.readouterr().out == "##fileformat=VCFv4.2\n"
 
 
-def test_main_verify_with_normal_uses_output_path_and_does_not_print(
+def test_main_annotate_with_normal_uses_output_path_and_does_not_print(
     monkeypatch,
     capsys,
     tmp_path,
@@ -132,7 +132,7 @@ def test_main_verify_with_normal_uses_output_path_and_does_not_print(
 
     exit_code = cli.main(
         [
-            "verify",
+            "annotate",
             "--vcf",
             "input.vcf",
             "--alignment",
@@ -164,7 +164,7 @@ def test_main_verify_with_normal_uses_output_path_and_does_not_print(
     assert capsys.readouterr().out == ""
 
 
-def test_main_verify_accepts_alignment_path_for_cram(monkeypatch, capsys, tmp_path) -> None:
+def test_main_annotate_accepts_alignment_path_for_cram(monkeypatch, capsys, tmp_path) -> None:
     calls: list[dict[str, object]] = []
 
     class FakeAlignmentFile:
@@ -207,7 +207,7 @@ def test_main_verify_accepts_alignment_path_for_cram(monkeypatch, capsys, tmp_pa
 
     exit_code = cli.main(
         [
-            "verify",
+            "annotate",
             "--vcf",
             "input.vcf",
             "--alignment",
@@ -237,14 +237,14 @@ def test_main_verify_accepts_alignment_path_for_cram(monkeypatch, capsys, tmp_pa
     assert capsys.readouterr().out == "##fileformat=VCFv4.2\n"
 
 
-def test_main_verify_requires_reference_for_cram(capsys, tmp_path) -> None:
+def test_main_annotate_requires_reference_for_cram(capsys, tmp_path) -> None:
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("normal1.bam\n", encoding="utf-8")
 
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",
@@ -261,14 +261,14 @@ def test_main_verify_requires_reference_for_cram(capsys, tmp_path) -> None:
     assert "--reference is required for CRAM input" in capsys.readouterr().err
 
 
-def test_main_verify_requires_reference_for_cram_in_normal_list(capsys, tmp_path) -> None:
+def test_main_annotate_requires_reference_for_cram_in_normal_list(capsys, tmp_path) -> None:
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("normal1.cram\n", encoding="utf-8")
 
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",
@@ -285,14 +285,14 @@ def test_main_verify_requires_reference_for_cram_in_normal_list(capsys, tmp_path
     assert "--reference is required for CRAM input" in capsys.readouterr().err
 
 
-def test_main_verify_rejects_empty_normal_list(capsys, tmp_path) -> None:
+def test_main_annotate_rejects_empty_normal_list(capsys, tmp_path) -> None:
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("# comment only\n", encoding="utf-8")
 
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",
@@ -309,14 +309,14 @@ def test_main_verify_rejects_empty_normal_list(capsys, tmp_path) -> None:
     assert "--normal-list must include at least one normal alignment path" in capsys.readouterr().err
 
 
-def test_main_verify_rejects_removed_output_format_flag(capsys, tmp_path) -> None:
+def test_main_annotate_rejects_removed_output_format_flag(capsys, tmp_path) -> None:
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("normal1.bam\n", encoding="utf-8")
 
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",
@@ -335,14 +335,14 @@ def test_main_verify_rejects_removed_output_format_flag(capsys, tmp_path) -> Non
     assert "unrecognized arguments: --output-format vcf" in capsys.readouterr().err
 
 
-def test_main_verify_rejects_output_path_with_non_vcf_suffix(capsys, tmp_path) -> None:
+def test_main_annotate_rejects_output_path_with_non_vcf_suffix(capsys, tmp_path) -> None:
     normal_list_path = tmp_path / "normals.txt"
     normal_list_path.write_text("normal1.bam\n", encoding="utf-8")
 
     try:
         cli.main(
             [
-                "verify",
+                "annotate",
                 "--vcf",
                 "input.vcf",
                 "--alignment",

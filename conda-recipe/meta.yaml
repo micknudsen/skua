@@ -26,7 +26,7 @@ test:
   imports:
     - skua
   commands:
-    - skua verify --help
+    - skua annotate --help
 
 about:
   home: https://github.com/micknudsen/skua

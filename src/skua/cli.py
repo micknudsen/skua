@@ -35,38 +35,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    verify_parser = subparsers.add_parser(
-        "verify",
-        help="Verify SNV evidence and emit annotated VCF output",
+    annotate_parser = subparsers.add_parser(
+        "annotate",
+        help="Annotate VCF with read counts and PON statistics",
         formatter_class=OptionalDefaultsHelpFormatter,
     )
-    verify_parser.add_argument("--vcf", required=True, help="Input VCF path (required)")
-    verify_parser.add_argument("--alignment", required=True, help="Input BAM/CRAM path (required)")
-    verify_parser.add_argument("--reference", help="Reference FASTA path (required for CRAM)")
-    verify_parser.add_argument(
+    annotate_parser.add_argument("--vcf", required=True, help="Input VCF path (required)")
+    annotate_parser.add_argument("--alignment", required=True, help="Input BAM/CRAM path (required)")
+    annotate_parser.add_argument("--reference", help="Reference FASTA path (required for CRAM)")
+    annotate_parser.add_argument(
         "--output",
         help="Optional output VCF path (.vcf or .vcf.gz)",
     )
-    verify_parser.add_argument(
+    annotate_parser.add_argument(
         "--normal-list",
         required=True,
         help="Path to file listing normal sample BAM/CRAM paths, one per line (required)",
     )
-    verify_parser.add_argument("--min-baseq", type=int, default=20, help="Minimum base quality")
-    verify_parser.add_argument("--min-mapq", type=int, default=20, help="Minimum mapping quality")
-    verify_parser.add_argument(
+    annotate_parser.add_argument("--min-baseq", type=int, default=20, help="Minimum base quality")
+    annotate_parser.add_argument("--min-mapq", type=int, default=20, help="Minimum mapping quality")
+    annotate_parser.add_argument(
         "--truncate",
         type=float,
         default=0.1,
         help="Truncation threshold for PON sample inclusion",
     )
-    verify_parser.add_argument(
+    annotate_parser.add_argument(
         "--pseudocount",
         type=float,
         default=None,
         help="Optional pseudocount for beta-binomial rate estimates",
     )
-    verify_parser.add_argument(
+    annotate_parser.add_argument(
         "--prior-variant-probability",
         type=float,
         default=0.5,
@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "verify":
+    if args.command == "annotate":
         if args.output is not None:
             output_path = Path(args.output)
             if not (

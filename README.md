@@ -16,9 +16,9 @@ pip install -e .
 
 ## Quick start
 
-### Verify with panel of normals
+### Annotate with panel of normals
 ```bash
-skua verify \
+skua annotate \
   --vcf input.vcf \
   --alignment case.bam \
   --normal-list normals.txt \
@@ -34,7 +34,7 @@ normal3.bam
 
 ### Print to stdout
 ```bash
-skua verify --vcf input.vcf --alignment case.bam --normal-list normals.txt
+skua annotate --vcf input.vcf --alignment case.bam --normal-list normals.txt
 ```
 
 ## Input requirements
@@ -71,7 +71,7 @@ Model-score fields:
 ## Options
 
 ```bash
-skua verify --help
+skua annotate --help
 ```
 
 Key parameters:
