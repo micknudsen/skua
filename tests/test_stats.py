@@ -30,7 +30,7 @@ def test_compute_stats_returns_typed_background_and_score() -> None:
     assert stats.normal_counts["non_alt_forward"] == 9
     assert stats.background_rate_by_channel["alt_forward"] == 0.05
     assert stats.expected_case_counts["alt_forward"] == 0.5
-    assert stats.bayes_factor >= 0.0
+    assert isinstance(stats.log_bayes_factor_artifact_vs_variant, float)
     assert 0.0 <= stats.artifact_posterior <= 1.0
     assert stats.dispersion_rho == 1e-4
     assert stats.pseudocount == sys.float_info.epsilon
@@ -61,7 +61,6 @@ def test_compute_stats_is_stable_for_zero_depth() -> None:
         "non_alt_forward": 0.0,
         "non_alt_reverse": 0.0,
     }
-    assert stats.bayes_factor == 1.0
     assert stats.log_bayes_factor_artifact_vs_variant == 0.0
     assert stats.artifact_posterior == 0.5
     assert stats.dispersion_rho == 1e-4
@@ -101,7 +100,7 @@ def test_compute_stats_null_posterior_decreases_with_stronger_signal() -> None:
     weaker_stats = compute_stats(weaker_case, normal_evidence)
     stronger_stats = compute_stats(stronger_case, normal_evidence)
 
-    assert stronger_stats.bayes_factor < weaker_stats.bayes_factor
+    assert stronger_stats.log_bayes_factor_artifact_vs_variant < weaker_stats.log_bayes_factor_artifact_vs_variant
     assert stronger_stats.artifact_posterior < weaker_stats.artifact_posterior
 
 
@@ -293,5 +292,5 @@ def test_compute_stats_applies_truncation_to_background_pool() -> None:
         truncate=0.1,
     )
 
-    assert truncated.bayes_factor < untruncated.bayes_factor
+    assert truncated.log_bayes_factor_artifact_vs_variant < untruncated.log_bayes_factor_artifact_vs_variant
     assert truncated.artifact_posterior < untruncated.artifact_posterior

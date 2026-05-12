@@ -25,7 +25,6 @@ class Stats:
     normal_counts: dict[str, int]
     background_rate_by_channel: dict[str, float]
     expected_case_counts: dict[str, float]
-    bayes_factor: float
     log_bayes_factor_artifact_vs_variant: float
     artifact_posterior: float
     dispersion_rho: float
@@ -305,23 +304,22 @@ def compute_stats(
             - _logbb(X_bw, N_bw, nu_bw_scaled, disp)
         )
 
-    if log_bayes_factor > 700:
-        bayes_factor = float("inf")
-    elif log_bayes_factor < -700:
-        bayes_factor = 0.0
-    else:
-        bayes_factor = math.exp(log_bayes_factor)
-
     prior_variant_probability = _bound(prior_variant_probability, 1e-12, 1 - 1e-12)
     odds_variant = prior_variant_probability / (1.0 - prior_variant_probability)
-    artifact_posterior = bayes_factor / (bayes_factor + odds_variant)
+    log_odds_variant = math.log(odds_variant)
+    delta = log_odds_variant - log_bayes_factor
+    if delta >= 0:
+        exp_neg_delta = math.exp(-delta)
+        artifact_posterior = exp_neg_delta / (1.0 + exp_neg_delta)
+    else:
+        exp_delta = math.exp(delta)
+        artifact_posterior = 1.0 / (1.0 + exp_delta)
 
     return Stats(
         case_counts=case_counts,
         normal_counts=normal_counts,
         background_rate_by_channel=background_rate_by_channel,
         expected_case_counts=expected_case_counts,
-        bayes_factor=bayes_factor,
         log_bayes_factor_artifact_vs_variant=log_bayes_factor,
         artifact_posterior=artifact_posterior,
         dispersion_rho=rho,

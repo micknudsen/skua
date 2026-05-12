@@ -48,7 +48,7 @@ Output FORMAT fields:
 - `SKUA_USABLE`: Total usable reads at this locus
 - `SKUA_UNUSABLE`: Total unusable reads (low quality, INDELs at locus, etc.)
 - `SKUA_ARTIFACT_POSTERIOR`: Posterior probability of artifact model (0–1)
-- `SKUA_BAYES_FACTOR`: Bayes factor comparing artifact vs. variant models
+- `SKUA_LOG_BAYES_FACTOR`: Log Bayes factor comparing artifact vs. variant models
 
 Output INFO fields:
 - `SKUA_PON_SAMPLE_COUNT`: Number of normal samples included after truncation

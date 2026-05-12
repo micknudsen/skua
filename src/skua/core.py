@@ -28,7 +28,7 @@ READ_COUNT_FORMAT_FIELD_DEFINITIONS: tuple[tuple[str, str], ...] = (
 
 MODEL_SCORE_FORMAT_FIELD_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     ("SKUA_ARTIFACT_POSTERIOR", "Float", "Posterior probability of the artifact model"),
-    ("SKUA_BAYES_FACTOR", "Float", "Bayes factor artifact-vs-variant"),
+    ("SKUA_LOG_BAYES_FACTOR", "Float", "Log Bayes factor artifact-vs-variant"),
 )
 
 PON_INFO_FIELD_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
@@ -97,11 +97,11 @@ def _annotate_read_count_format_fields(record: Any, evidence: AggregatedEvidence
         sample["SKUA_UNUSABLE"] = evidence.unusable
 
 
-def _annotate_pon_sample_format_fields(record: Any, *, artifact_posterior: float, bayes_factor: float) -> None:
+def _annotate_pon_sample_format_fields(record: Any, *, artifact_posterior: float, log_bayes_factor: float) -> None:
     """Set PON model output FORMAT annotations on all sample columns."""
     for sample in record.samples.values():
         sample["SKUA_ARTIFACT_POSTERIOR"] = float(artifact_posterior)
-        sample["SKUA_BAYES_FACTOR"] = float(bayes_factor)
+        sample["SKUA_LOG_BAYES_FACTOR"] = float(log_bayes_factor)
 
 
 def _render_annotated_vcf_payload(output_path: Path) -> str:
@@ -227,7 +227,7 @@ def verify_snv_vcf_to_annotated_vcf_with_normals(
                         _annotate_pon_sample_format_fields(
                             record,
                             artifact_posterior=stats.artifact_posterior,
-                            bayes_factor=stats.bayes_factor,
+                            log_bayes_factor=stats.log_bayes_factor_artifact_vs_variant,
                         )
                         record.info["SKUA_PON_SAMPLE_COUNT"] = len(normal_samples_included)
                         record.info["SKUA_PON_ALT_FWD"] = normal_output_evidence.alt_forward
@@ -506,7 +506,7 @@ def format_verification_results_with_normals(
                 "alt": variant.alt,
                 "stats": {
                     "artifact_posterior": stats.artifact_posterior,
-                    "bayes_factor": stats.bayes_factor,
+                    "log_bayes_factor_artifact_vs_variant": stats.log_bayes_factor_artifact_vs_variant,
                     "dispersion_factor": stats.dispersion_rho,
                     "pon_sample_count": normal_samples_used,
                 },

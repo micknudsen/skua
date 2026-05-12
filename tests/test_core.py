@@ -558,7 +558,7 @@ def test_verify_snv_vcf_to_annotated_vcf_with_normals_writes_info_and_format(tmp
         sample = record.samples["CASE"]
         assert sample["SKUA_ALT_FWD"] == 1
         assert 0.0 <= sample["SKUA_ARTIFACT_POSTERIOR"] <= 1.0
-        assert sample["SKUA_BAYES_FACTOR"] >= 0.0
+        assert isinstance(sample["SKUA_LOG_BAYES_FACTOR"], float)
         assert record.info["SKUA_PON_SAMPLE_COUNT"] == 1
         assert record.info["SKUA_PON_ALT_FWD"] == 0
         assert record.info["SKUA_PON_ALT_REV"] == 0
@@ -696,7 +696,7 @@ def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> No
     assert result[0]["counts"]["case"]["unusable"] == 0
     assert result[0]["counts"]["case"]["unusable_by_reason"] == {}
     assert 0.0 <= result[0]["stats"]["artifact_posterior"] <= 1.0
-    assert result[0]["stats"]["bayes_factor"] >= 0.0
+    assert isinstance(result[0]["stats"]["log_bayes_factor_artifact_vs_variant"], float)
     assert result[0]["stats"]["dispersion_factor"] == 1e-4
     assert result[0]["stats"]["pon_sample_count"] == 1
     assert list(result[0].keys()) == [
@@ -709,7 +709,7 @@ def test_verify_snv_vcf_to_json_with_normals_returns_pon_payload(tmp_path) -> No
     ]
     assert list(result[0]["stats"].keys()) == [
         "artifact_posterior",
-        "bayes_factor",
+        "log_bayes_factor_artifact_vs_variant",
         "dispersion_factor",
         "pon_sample_count",
     ]
