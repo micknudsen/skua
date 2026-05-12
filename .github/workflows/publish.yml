@@ -40,13 +40,10 @@ jobs:
           PKG_PATH="$(conda build conda-recipe/ --output)"
           echo "pkg_path=${PKG_PATH}" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke test package install
+      - name: Smoke test built package
         shell: bash -l {0}
         run: |
-          CONDA_BLD_DIR="$(conda info --base)/conda-bld"
-          conda index "${CONDA_BLD_DIR}"
-          conda create -y -n skua-smoke -c "file://${CONDA_BLD_DIR}" -c conda-forge -c bioconda python=3.12 skua
-          conda run -n skua-smoke skua annotate --help
+          conda build --test "${{ steps.locate.outputs.pkg_path }}"
 
       - name: Upload conda artifact
         uses: actions/upload-artifact@v4
